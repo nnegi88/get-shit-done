@@ -2031,3 +2031,398 @@ describe('scaffold command', () => {
     assert.strictEqual(output.reason, 'already_exists');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolve-model command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('resolve-model command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid agent type returns expected model mapping', () => {
+    // Write a config with a known profile
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality' })
+    );
+
+    const result = runGsdTools('resolve-model gsd-executor', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'opus', 'quality profile for executor should return opus');
+    assert.strictEqual(output.profile, 'quality', 'profile should be quality');
+  });
+
+  test('unknown agent type returns default fallback', () => {
+    const result = runGsdTools('resolve-model unknown-agent-xyz', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.model, 'sonnet', 'unknown agent should fallback to sonnet');
+    assert.strictEqual(output.unknown_agent, true, 'should flag unknown agent');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// find-phase command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('find-phase command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('finds existing phase directory by number', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api-layer');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(phaseDir, '03-01-SUMMARY.md'), '# Summary');
+
+    const result = runGsdTools('find-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'phase should be found');
+    assert.strictEqual(output.phase_number, '03', 'phase number correct');
+    assert.strictEqual(output.phase_name, 'api-layer', 'phase name extracted');
+    assert.ok(output.directory.includes('03-api-layer'), 'directory path correct');
+    assert.deepStrictEqual(output.plans, ['03-01-PLAN.md'], 'plans listed');
+    assert.deepStrictEqual(output.summaries, ['03-01-SUMMARY.md'], 'summaries listed');
+  });
+
+  test('returns not-found for missing phase number', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+
+    const result = runGsdTools('find-phase 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'should not find missing phase');
+    assert.strictEqual(output.directory, null, 'directory should be null');
+  });
+
+  test('finds decimal phase directory', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-foundation'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01.1-hotfix'), { recursive: true });
+
+    const result = runGsdTools('find-phase 1.1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, true, 'decimal phase should be found');
+    assert.strictEqual(output.phase_number, '01.1', 'phase number includes decimal');
+    assert.ok(output.directory.includes('01.1-hotfix'), 'directory correct');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generate-slug command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('generate-slug command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('basic text generates lowercase hyphenated slug', () => {
+    const result = runGsdTools('generate-slug "User Dashboard Page"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.slug, 'user-dashboard-page', 'slug should be lowercase hyphenated');
+  });
+
+  test('special characters stripped or replaced', () => {
+    const result = runGsdTools('generate-slug "Hello World! @#$ Test"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.slug, 'hello-world-test', 'special chars should be stripped');
+  });
+
+  test('empty input handled gracefully', () => {
+    const result = runGsdTools('generate-slug', tmpDir);
+    assert.ok(!result.success, 'should fail for empty input');
+    assert.ok(result.error.includes('text required'), 'error mentions text required');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// current-timestamp command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('current-timestamp command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('default format returns ISO timestamp string', () => {
+    const result = runGsdTools('current-timestamp', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // ISO format: YYYY-MM-DDTHH:MM:SS.sssZ
+    assert.ok(output.timestamp.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/), 'should be ISO-like timestamp');
+  });
+
+  test('date format returns date-only string', () => {
+    const result = runGsdTools('current-timestamp date', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.timestamp.match(/^\d{4}-\d{2}-\d{2}$/), 'should be date-only format YYYY-MM-DD');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// list-todos command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('list-todos command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('empty project returns empty array', () => {
+    const result = runGsdTools('list-todos', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 0, 'count should be 0');
+    assert.deepStrictEqual(output.todos, [], 'todos should be empty');
+  });
+
+  test('with TODO files returns list', () => {
+    const pendingDir = path.join(tmpDir, '.planning', 'todos', 'pending');
+    fs.mkdirSync(pendingDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pendingDir, 'add-tests.md'),
+      'title: Add more tests\narea: testing\ncreated: 2025-01-01\n'
+    );
+    fs.writeFileSync(
+      path.join(pendingDir, 'fix-bug.md'),
+      'title: Fix login bug\narea: auth\ncreated: 2025-01-02\n'
+    );
+
+    const result = runGsdTools('list-todos', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 2, 'count should be 2');
+    assert.strictEqual(output.todos.length, 2, 'should have 2 todos');
+    assert.ok(output.todos.some(t => t.title === 'Add more tests'), 'should contain first todo');
+    assert.ok(output.todos.some(t => t.title === 'Fix login bug'), 'should contain second todo');
+  });
+
+  test('filtered by area', () => {
+    const pendingDir = path.join(tmpDir, '.planning', 'todos', 'pending');
+    fs.mkdirSync(pendingDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pendingDir, 'add-tests.md'),
+      'title: Add more tests\narea: testing\ncreated: 2025-01-01\n'
+    );
+    fs.writeFileSync(
+      path.join(pendingDir, 'fix-bug.md'),
+      'title: Fix login bug\narea: auth\ncreated: 2025-01-02\n'
+    );
+
+    const result = runGsdTools('list-todos auth', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.count, 1, 'count should be 1 after filtering');
+    assert.strictEqual(output.todos[0].area, 'auth', 'filtered todo should be auth area');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify-path-exists command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify-path-exists command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('existing path returns exists true', () => {
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'test-file.md'), '# Test');
+
+    const result = runGsdTools('verify-path-exists .planning/test-file.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.exists, true, 'existing file should return true');
+    assert.strictEqual(output.type, 'file', 'type should be file');
+  });
+
+  test('non-existent path returns exists false', () => {
+    const result = runGsdTools('verify-path-exists .planning/nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.exists, false, 'missing file should return false');
+    assert.strictEqual(output.type, null, 'type should be null for missing path');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// config-ensure-section command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('config-ensure-section command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('creates section in new config', () => {
+    // Remove existing config if any
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+
+    const result = runGsdTools('config-ensure-section', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create new config');
+
+    // Verify file was actually written with defaults
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(config.model_profile, 'balanced', 'default model_profile should be balanced');
+    assert.strictEqual(config.commit_docs, true, 'commit_docs should default to true');
+  });
+
+  test('idempotent on existing section', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ model_profile: 'quality', custom: true }));
+
+    const result = runGsdTools('config-ensure-section', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, false, 'should not recreate existing config');
+    assert.strictEqual(output.reason, 'already_exists', 'reason should be already_exists');
+
+    // Original content preserved
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(config.custom, true, 'original content should be preserved');
+  });
+
+  test('handles missing .planning directory gracefully', () => {
+    // Remove the .planning directory entirely
+    fs.rmSync(path.join(tmpDir, '.planning'), { recursive: true, force: true });
+
+    const result = runGsdTools('config-ensure-section', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create config even when .planning missing');
+    assert.ok(fs.existsSync(path.join(tmpDir, '.planning', 'config.json')), 'config file should exist');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// config-set command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('config-set command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('sets value in existing config', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ model_profile: 'balanced' }));
+
+    const result = runGsdTools('config-set model_profile quality', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should update successfully');
+    assert.strictEqual(output.key, 'model_profile', 'key should match');
+    assert.strictEqual(output.value, 'quality', 'value should be set');
+
+    // Verify file written
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(config.model_profile, 'quality', 'file should have new value');
+  });
+
+  test('sets nested key path', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ workflow: { research: true } }));
+
+    const result = runGsdTools('config-set workflow.verifier true', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should update nested value');
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(config.workflow.verifier, true, 'nested value should be set');
+    assert.strictEqual(config.workflow.research, true, 'existing nested value preserved');
+  });
+
+  test('creates config if missing', () => {
+    const configPath = path.join(tmpDir, '.planning', 'config.json');
+    // No config file exists
+
+    const result = runGsdTools('config-set model_profile budget', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should create and set');
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    assert.strictEqual(config.model_profile, 'budget', 'value should be set in new config');
+  });
+});
