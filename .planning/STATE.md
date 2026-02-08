@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Every fix must leave the system more reliable and maintainable without breaking existing installations or `.planning/` directory compatibility.
-**Current focus:** Phase 01.1 - Migrate GSD from Subagents to Agent Teams
+**Current focus:** Phase 02 - Error Handling and Security
 
 ## Current Position
 
-Phase: 01.1 of 6 (Migrate GSD from Subagents to Agent Teams)
-Plan: 5 of 5 in current phase
-Status: Phase complete ✓ (verified)
-Last activity: 2026-02-09 -- Phase 01.1 verified and complete
+Phase: 02 of 6 (Error Handling and Security)
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-02-09 -- Plan 02-01 complete (error classes + exit codes)
 
 Progress: [██████████] 73%
 
@@ -75,6 +75,8 @@ Recent decisions affecting current work:
 - [01.1-05]: Orchestrator derives hypotheses before spawning investigators for distinct non-overlapping coverage
 - [01.1-05]: Investigators broadcast evidence and directly challenge each other via SendMessage for peer review
 - [01.1-05]: All 12 GSD guarantees verified as preserved across the entire 4-workflow migration
+- [02-01]: Inline error classes in gsd-tools.js following existing monolith pattern -- Phase 3 will extract
+- [02-01]: EXIT_USAGE for missing args/unknown subcommands, EXIT_CONFIG for missing planning files, EXIT_FILESYSTEM for missing user paths
 
 ### Roadmap Evolution
 
@@ -92,5 +94,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Phase 01.1 complete and verified -- all 7 success criteria passed
-Resume file: .planning/phases/02-error-handling/
+Stopped at: Completed 02-01-PLAN.md
+Resume file: .planning/phases/02-error-handling-security/
