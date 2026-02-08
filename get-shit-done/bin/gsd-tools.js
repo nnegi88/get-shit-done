@@ -120,6 +120,36 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// ─── POSIX Exit Codes ────────────────────────────────────────────────────────
+
+const EXIT_SUCCESS = 0;
+const EXIT_ERROR = 1;
+const EXIT_USAGE = 2;
+const EXIT_CONFIG = 3;
+const EXIT_FILESYSTEM = 4;
+
+// ─── Error Class Hierarchy ───────────────────────────────────────────────────
+
+class GsdError extends Error {
+  constructor(message, code = EXIT_ERROR) {
+    super(message);
+    this.name = 'GsdError';
+    this.code = code;
+  }
+}
+class ValidationError extends GsdError {
+  constructor(message) { super(message, EXIT_USAGE); this.name = 'ValidationError'; }
+}
+class FileSystemError extends GsdError {
+  constructor(message) { super(message, EXIT_FILESYSTEM); this.name = 'FileSystemError'; }
+}
+class ConfigError extends GsdError {
+  constructor(message) { super(message, EXIT_CONFIG); this.name = 'ConfigError'; }
+}
+class PhaseError extends GsdError {
+  constructor(message) { super(message, EXIT_ERROR); this.name = 'PhaseError'; }
+}
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
