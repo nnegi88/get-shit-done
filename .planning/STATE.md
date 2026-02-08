@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - [01-01]: 59 tests exceeding 45+ target for thorough characterization coverage
 - [01-02]: Followed existing test pattern exactly -- no new abstractions introduced
 - [01-02]: Used area filter for list-todos tests matching actual implementation
+- [01-03]: Characterized actual lexicographic sort behavior in phase numbering rather than asserting ideal numeric sort
+- [01-03]: Used string literals for YAML with 4-space indentation for parseMustHavesBlock-dependent tests
+- [01-03]: Error recovery tests accept both graceful JSON and non-zero exit as valid error handling
 - [01-04]: Used --config-dir flag for install isolation instead of mocking home directory
 - [01-04]: Tested hooks via subprocess stdin/stdout rather than requiring internal modules
 - [01-04]: Kept integration tests in same file as unit tests for cohesion
