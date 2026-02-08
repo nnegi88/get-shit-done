@@ -10,33 +10,34 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 01.1 of 6 (Migrate GSD from Subagents to Agent Teams)
-Plan: 4 of 5 in current phase
-Status: In progress
-Last activity: 2026-02-09 -- Completed 01.1-04-PLAN.md (new-project workflow team migration)
+Plan: 5 of 5 in current phase
+Status: Phase complete (awaiting verification)
+Last activity: 2026-02-09 -- Completed 01.1-05-PLAN.md (debug workflow + integration verification)
 
-Progress: [████████░░] 64%
+Progress: [██████████] 73%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 5 min
-- Total execution time: 0.68 hours
+- Total execution time: 0.73 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 4 | 24 min | 6 min |
-| 01.1 | 4 | 17 min | 4 min |
+| 01.1 | 5 | 20 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-04 (9 min), 01.1-01 (5 min), 01.1-02 (5 min), 01.1-03 (4 min), 01.1-04 (3 min)
+- Last 5 plans: 01.1-01 (5 min), 01.1-02 (5 min), 01.1-03 (4 min), 01.1-04 (3 min), 01.1-05 (3 min)
 - Trend: Accelerating
 
 *Updated after each plan completion*
 | Phase 01.1 P02 | 6 min | 2 tasks | 2 files |
 | Phase 01.1 P03 | 4 min | 2 tasks | 2 files |
+| Phase 01.1 P05 | 3 min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Preserved all existing functionality verbatim in the fallback path rather than rewriting
 - [Phase 01.1]: Team mode creates ALL tasks upfront with dependency chains instead of spawning per-wave
 - [Phase 01.1]: Checkpoint handling in team mode uses SendMessage to preserve executor session context
+- [01.1-05]: Orchestrator derives hypotheses before spawning investigators for distinct non-overlapping coverage
+- [01.1-05]: Investigators broadcast evidence and directly challenge each other via SendMessage for peer review
+- [01.1-05]: All 12 GSD guarantees verified as preserved across the entire 4-workflow migration
 
 ### Roadmap Evolution
 
@@ -88,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 01.1-03-PLAN.md (execute-phase and execute-plan workflow migration)
-Resume file: .planning/phases/01.1-migrate-gsd-from-subagents-to-agent-teams/01.1-05-PLAN.md
+Stopped at: Completed 01.1-05-PLAN.md (debug workflow + integration verification -- Phase 01.1 complete)
+Resume file: None (phase complete, awaiting verification)
