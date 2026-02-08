@@ -167,6 +167,66 @@ function getCachedRegex(pattern, flags) {
   return re;
 }
 
+function sanitizeJson(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeJson);
+  const clean = {};
+  for (const key of Object.keys(obj)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    clean[key] = sanitizeJson(obj[key]);
+  }
+  return clean;
+}
+
+function validatePath(filePath, cwd) {
+  const resolved = path.resolve(cwd, filePath);
+  if (!resolved.startsWith(cwd + path.sep) && resolved !== cwd) {
+    return { valid: false, error: `Path '${filePath}' resolves outside project root` };
+  }
+  try {
+    const real = fs.realpathSync(resolved);
+    if (!real.startsWith(cwd + path.sep) && real !== cwd) {
+      return { valid: false, error: `Path '${filePath}' follows symlink outside project root` };
+    }
+  } catch {
+    // File doesn't exist yet, that's OK for write operations
+  }
+  return { valid: true, resolved };
+}
+
+// ─── Input Validation ───────────────────────────────────────────────────────
+
+function validatePhaseNumber(phase) {
+  if (!phase) return 'Phase number required';
+  // Accept: "01", "1", "02", "2", "01.1", "1.1", "12", "12.3"
+  if (!/^\d+(\.\d+)?$/.test(phase)) {
+    return `Invalid phase number '${phase}'. Expected format: N or N.N (e.g., "01", "2", "1.1")`;
+  }
+  return null; // valid
+}
+
+function validateFieldName(field) {
+  if (!field) return 'Field name required';
+  // Allow alphanumeric, underscores, hyphens, spaces (for markdown field names like "Current focus")
+  if (!/^[\w\s-]+$/i.test(field)) {
+    return `Invalid field name '${field}'. Only letters, numbers, underscores, hyphens, and spaces allowed`;
+  }
+  if (field.length > 100) {
+    return `Field name too long (${field.length} chars, max 100)`;
+  }
+  return null; // valid
+}
+
+function validateJsonString(str, paramName) {
+  if (!str) return `${paramName || 'JSON string'} required`;
+  try {
+    JSON.parse(str);
+    return null; // valid
+  } catch (e) {
+    return `Invalid JSON for ${paramName || 'input'}: ${e.message}`;
+  }
+}
+
 // ─── Model Profile Table ─────────────────────────────────────────────────────
 
 const MODEL_PROFILES = {
