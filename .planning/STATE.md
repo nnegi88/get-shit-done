@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Every fix must leave the system more reliable and maintainable without breaking existing installations or `.planning/` directory compatibility.
-**Current focus:** Phase 1 - Test Safety Net
+**Current focus:** Phase 01.1 - Migrate GSD from Subagents to Agent Teams
 
 ## Current Position
 
-Phase: 1 of 6 (Test Safety Net)
-Plan: 4 of 4 in current phase
-Status: Phase complete
-Last activity: 2026-02-08 -- Completed 01-04-PLAN.md (install runtime integration and hook tests)
+Phase: 01.1 of 6 (Migrate GSD from Subagents to Agent Teams)
+Plan: 1 of 5 in current phase
+Status: In progress
+Last activity: 2026-02-09 -- Completed 01.1-01-PLAN.md (add team communication protocol to agents)
 
-Progress: [██████░░░░] 33%
+Progress: [██████░░░░] 36%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: 6 min
-- Total execution time: 0.40 hours
+- Total execution time: 0.48 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 4 | 24 min | 6 min |
+| 01.1 | 1 | 5 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-02 (4 min), 01-03 (7 min), 01-04 (9 min)
+- Last 5 plans: 01-02 (4 min), 01-03 (7 min), 01-04 (9 min), 01.1-01 (5 min)
 - Trend: Steady
 
 *Updated after each plan completion*
@@ -55,6 +56,13 @@ Recent decisions affecting current work:
 - [01-04]: Used --config-dir flag for install isolation instead of mocking home directory
 - [01-04]: Tested hooks via subprocess stdin/stdout rather than requiring internal modules
 - [01-04]: Kept integration tests in same file as unit tests for cohesion
+- [01.1-01]: Append-only approach for agent updates -- existing content untouched, protocol added after last section
+- [01.1-01]: In-process teammate mode over tmux for no external dependency
+- [01.1-01]: Standalone agents get base protocol with note rather than being skipped
+
+### Roadmap Evolution
+
+- Phase 01.1 inserted after Phase 1: Migrate GSD from Subagents to Agent Teams (URGENT)
 
 ### Pending Todos
 
@@ -67,6 +75,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-08
-Stopped at: Completed 01-04-PLAN.md (install runtime integration and hook tests) -- Phase 01 complete
-Resume file: .planning/phases/02-error-handling/
+Last session: 2026-02-09
+Stopped at: Completed 01.1-01-PLAN.md (add team communication protocol to agents)
+Resume file: .planning/phases/01.1-migrate-gsd-from-subagents-to-agent-teams/01.1-02-PLAN.md
