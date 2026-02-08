@@ -43,6 +43,10 @@
   "scripts": {
     "build:hooks": "node scripts/build-hooks.js",
     "prepublishOnly": "npm run build:hooks",
-    "test": "node --test get-shit-done/bin/gsd-tools.test.js"
+    "test": "node --test get-shit-done/bin/gsd-tools.test.js bin/install.test.js hooks/hooks.test.js",
+    "test:tools": "node --test get-shit-done/bin/gsd-tools.test.js",
+    "test:install": "node --test bin/install.test.js",
+    "test:hooks": "node --test hooks/hooks.test.js",
+    "test:filter": "node --test --test-name-pattern"
   }
 }
