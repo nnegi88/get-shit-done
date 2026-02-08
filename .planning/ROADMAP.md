@@ -31,11 +31,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. JSONC parser handles edge cases (nested comments, escaped quotes, BOM variants, malformed input) without crashing
   4. Frontmatter conversion is tested for all 3 runtime formats and produces correct output for each
   5. Phase numbering handles edge cases (double-digit phases, decimal transitions like 1.9 to 1.10) correctly in tests
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- install.js module.exports guard + pure function unit tests (JSONC, frontmatter, tool mappers)
+- [ ] 01-02-PLAN.md -- gsd-tools.js Tier 1 standalone commands + Tier 2 state subcommands characterization tests
+- [ ] 01-03-PLAN.md -- gsd-tools.js Tier 3-4 commands (frontmatter/template/verify/init) + error recovery + phase numbering edge cases
+- [ ] 01-04-PLAN.md -- install.js runtime integration tests (3 runtimes) + hook tests + npm test script updates
 
 ### Phase 2: Error Handling & Security
 **Goal**: Users get clear error messages on bad input, failures are visible instead of silent, and all inputs are validated against security threats
@@ -119,7 +121,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Safety Net | 0/0 | Not started | - |
+| 1. Test Safety Net | 0/4 | Planned | - |
 | 2. Error Handling & Security | 0/0 | Not started | - |
 | 3. Monolith Decomposition | 0/0 | Not started | - |
 | 4. Data Integrity | 0/0 | Not started | - |
@@ -128,4 +130,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-08 (Phase 1 planned)*
