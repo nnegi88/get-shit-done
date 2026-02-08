@@ -384,6 +384,374 @@ Check if this is greenfield or subsequent milestone:
 - If no "Validated" requirements in PROJECT.md → Greenfield (building from scratch)
 - If "Validated" requirements exist → Subsequent milestone (adding to existing app)
 
+### 6a. Attempt Team-Based Research
+
+Try to create a research team for cross-pollination between researchers and synthesizer clarification.
+
+```
+TeamCreate({ team_name: "gsd-init-{project_slug}", description: "Research team for new project initialization" })
+```
+
+**If TeamCreate succeeds — TEAM MODE:**
+
+Display spawning indicator:
+```
+◆ Creating research team with cross-pollination...
+  → Stack researcher (can message other researchers)
+  → Features researcher (can message other researchers)
+  → Architecture researcher (can message other researchers)
+  → Pitfalls researcher (can message other researchers)
+  → Synthesizer (can ask researchers for clarification)
+```
+
+**Create tasks with dependency chain:**
+
+```
+# 4 parallel research tasks (no dependencies between them — Wave 1)
+stack_task = TaskCreate({
+  subject: "Research standard stack for [domain]",
+  description: "Write STACK.md to .planning/research/STACK.md. Cross-pollinate findings with other researchers via SendMessage.",
+  activeForm: "Researching stack"
+})
+
+features_task = TaskCreate({
+  subject: "Research features for [domain]",
+  description: "Write FEATURES.md to .planning/research/FEATURES.md. Cross-pollinate findings with other researchers via SendMessage.",
+  activeForm: "Researching features"
+})
+
+architecture_task = TaskCreate({
+  subject: "Research architecture for [domain]",
+  description: "Write ARCHITECTURE.md to .planning/research/ARCHITECTURE.md. Cross-pollinate findings with other researchers via SendMessage.",
+  activeForm: "Researching architecture"
+})
+
+pitfalls_task = TaskCreate({
+  subject: "Research pitfalls for [domain]",
+  description: "Write PITFALLS.md to .planning/research/PITFALLS.md. Cross-pollinate findings with other researchers via SendMessage.",
+  activeForm: "Researching pitfalls"
+})
+
+# Synthesis task depends on all 4 research tasks (Wave 2)
+synthesis_task = TaskCreate({
+  subject: "Synthesize research into SUMMARY.md",
+  description: "Read all 4 research files, resolve contradictions by messaging researchers, synthesize into .planning/research/SUMMARY.md, commit all research",
+  activeForm: "Synthesizing research",
+  addBlockedBy: [stack_task.id, features_task.id, architecture_task.id, pitfalls_task.id]
+})
+```
+
+**Spawn researcher teammates (4 parallel — Wave 1):**
+
+Each researcher is spawned into the team with cross-pollination instructions. They can message each other directly when they discover findings relevant to another researcher's domain.
+
+```
+Task(
+  team_name: "gsd-init-{project_slug}",
+  name: "stack-researcher",
+  subagent_type: "gsd-project-researcher",
+  prompt: "First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
+You are the STACK researcher on a research team. Check TaskList() for your task and claim it with TaskUpdate.
+
+IMPORTANT — Cross-pollination: You are working alongside 3 other researchers (features-researcher, architecture-researcher, pitfalls-researcher). If you discover something that affects their research, message them directly:
+- Architecture-relevant (e.g., 'auth library requires Redis'): SendMessage({ type: 'message', recipient: 'architecture-researcher', content: '...', summary: '...' })
+- Feature-relevant (e.g., 'framework has built-in auth'): SendMessage({ type: 'message', recipient: 'features-researcher', content: '...', summary: '...' })
+- Pitfall-relevant (e.g., 'library X deprecated, migration required'): SendMessage({ type: 'message', recipient: 'pitfalls-researcher', content: '...', summary: '...' })
+
+When you receive messages from other researchers, incorporate their findings into your research.
+
+When the synthesizer asks for clarification, respond promptly via SendMessage.
+
+After completing your research file, mark your task complete with TaskUpdate.
+
+<research_type>
+Project Research — Stack dimension for [domain].
+</research_type>
+
+<milestone_context>
+[greenfield OR subsequent]
+
+Greenfield: Research the standard stack for building [domain] from scratch.
+Subsequent: Research what's needed to add [target features] to an existing [domain] app. Don't re-research the existing system.
+</milestone_context>
+
+<question>
+What's the standard 2025 stack for [domain]?
+</question>
+
+<project_context>
+[PROJECT.md summary - core value, constraints, what they're building]
+</project_context>
+
+<downstream_consumer>
+Your STACK.md feeds into roadmap creation. Be prescriptive:
+- Specific libraries with versions
+- Clear rationale for each choice
+- What NOT to use and why
+</downstream_consumer>
+
+<quality_gate>
+- [ ] Versions are current (verify with Context7/official docs, not training data)
+- [ ] Rationale explains WHY, not just WHAT
+- [ ] Confidence levels assigned to each recommendation
+</quality_gate>
+
+<output>
+Write to: .planning/research/STACK.md
+Use template: ~/.claude/get-shit-done/templates/research-project/STACK.md
+</output>
+")
+
+Task(
+  team_name: "gsd-init-{project_slug}",
+  name: "features-researcher",
+  subagent_type: "gsd-project-researcher",
+  prompt: "First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
+You are the FEATURES researcher on a research team. Check TaskList() for your task and claim it with TaskUpdate.
+
+IMPORTANT — Cross-pollination: You are working alongside 3 other researchers (stack-researcher, architecture-researcher, pitfalls-researcher). If you discover something that affects their research, message them directly:
+- Stack-relevant (e.g., 'feature X needs specific library'): SendMessage({ type: 'message', recipient: 'stack-researcher', content: '...', summary: '...' })
+- Architecture-relevant (e.g., 'real-time features need WebSocket layer'): SendMessage({ type: 'message', recipient: 'architecture-researcher', content: '...', summary: '...' })
+- Pitfall-relevant (e.g., 'feature scope creep common in this domain'): SendMessage({ type: 'message', recipient: 'pitfalls-researcher', content: '...', summary: '...' })
+
+When you receive messages from other researchers, incorporate their findings into your research.
+
+When the synthesizer asks for clarification, respond promptly via SendMessage.
+
+After completing your research file, mark your task complete with TaskUpdate.
+
+<research_type>
+Project Research — Features dimension for [domain].
+</research_type>
+
+<milestone_context>
+[greenfield OR subsequent]
+
+Greenfield: What features do [domain] products have? What's table stakes vs differentiating?
+Subsequent: How do [target features] typically work? What's expected behavior?
+</milestone_context>
+
+<question>
+What features do [domain] products have? What's table stakes vs differentiating?
+</question>
+
+<project_context>
+[PROJECT.md summary]
+</project_context>
+
+<downstream_consumer>
+Your FEATURES.md feeds into requirements definition. Categorize clearly:
+- Table stakes (must have or users leave)
+- Differentiators (competitive advantage)
+- Anti-features (things to deliberately NOT build)
+</downstream_consumer>
+
+<quality_gate>
+- [ ] Categories are clear (table stakes vs differentiators vs anti-features)
+- [ ] Complexity noted for each feature
+- [ ] Dependencies between features identified
+</quality_gate>
+
+<output>
+Write to: .planning/research/FEATURES.md
+Use template: ~/.claude/get-shit-done/templates/research-project/FEATURES.md
+</output>
+")
+
+Task(
+  team_name: "gsd-init-{project_slug}",
+  name: "architecture-researcher",
+  subagent_type: "gsd-project-researcher",
+  prompt: "First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
+You are the ARCHITECTURE researcher on a research team. Check TaskList() for your task and claim it with TaskUpdate.
+
+IMPORTANT — Cross-pollination: You are working alongside 3 other researchers (stack-researcher, features-researcher, pitfalls-researcher). If you discover something that affects their research, message them directly:
+- Stack-relevant (e.g., 'architecture requires specific database'): SendMessage({ type: 'message', recipient: 'stack-researcher', content: '...', summary: '...' })
+- Feature-relevant (e.g., 'component boundaries suggest feature grouping'): SendMessage({ type: 'message', recipient: 'features-researcher', content: '...', summary: '...' })
+- Pitfall-relevant (e.g., 'monolith patterns cause scaling issues'): SendMessage({ type: 'message', recipient: 'pitfalls-researcher', content: '...', summary: '...' })
+
+When you receive messages from other researchers, incorporate their findings into your research.
+
+When the synthesizer asks for clarification, respond promptly via SendMessage.
+
+After completing your research file, mark your task complete with TaskUpdate.
+
+<research_type>
+Project Research — Architecture dimension for [domain].
+</research_type>
+
+<milestone_context>
+[greenfield OR subsequent]
+
+Greenfield: How are [domain] systems typically structured? What are major components?
+Subsequent: How do [target features] integrate with existing [domain] architecture?
+</milestone_context>
+
+<question>
+How are [domain] systems typically structured? What are major components?
+</question>
+
+<project_context>
+[PROJECT.md summary]
+</project_context>
+
+<downstream_consumer>
+Your ARCHITECTURE.md informs phase structure in roadmap. Include:
+- Component boundaries (what talks to what)
+- Data flow (how information moves)
+- Suggested build order (dependencies between components)
+</downstream_consumer>
+
+<quality_gate>
+- [ ] Components clearly defined with boundaries
+- [ ] Data flow direction explicit
+- [ ] Build order implications noted
+</quality_gate>
+
+<output>
+Write to: .planning/research/ARCHITECTURE.md
+Use template: ~/.claude/get-shit-done/templates/research-project/ARCHITECTURE.md
+</output>
+")
+
+Task(
+  team_name: "gsd-init-{project_slug}",
+  name: "pitfalls-researcher",
+  subagent_type: "gsd-project-researcher",
+  prompt: "First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
+
+You are the PITFALLS researcher on a research team. Check TaskList() for your task and claim it with TaskUpdate.
+
+IMPORTANT — Cross-pollination: You are working alongside 3 other researchers (stack-researcher, features-researcher, architecture-researcher). If you discover something that affects their research, message them directly:
+- Stack-relevant (e.g., 'deprecated library still widely recommended'): SendMessage({ type: 'message', recipient: 'stack-researcher', content: '...', summary: '...' })
+- Feature-relevant (e.g., 'feature X commonly over-engineered'): SendMessage({ type: 'message', recipient: 'features-researcher', content: '...', summary: '...' })
+- Architecture-relevant (e.g., 'premature optimization of component X'): SendMessage({ type: 'message', recipient: 'architecture-researcher', content: '...', summary: '...' })
+
+When you receive messages from other researchers, incorporate their findings into your research.
+
+When the synthesizer asks for clarification, respond promptly via SendMessage.
+
+After completing your research file, mark your task complete with TaskUpdate.
+
+<research_type>
+Project Research — Pitfalls dimension for [domain].
+</research_type>
+
+<milestone_context>
+[greenfield OR subsequent]
+
+Greenfield: What do [domain] projects commonly get wrong? Critical mistakes?
+Subsequent: What are common mistakes when adding [target features] to [domain]?
+</milestone_context>
+
+<question>
+What do [domain] projects commonly get wrong? Critical mistakes?
+</question>
+
+<project_context>
+[PROJECT.md summary]
+</project_context>
+
+<downstream_consumer>
+Your PITFALLS.md prevents mistakes in roadmap/planning. For each pitfall:
+- Warning signs (how to detect early)
+- Prevention strategy (how to avoid)
+- Which phase should address it
+</downstream_consumer>
+
+<quality_gate>
+- [ ] Pitfalls are specific to this domain (not generic advice)
+- [ ] Prevention strategies are actionable
+- [ ] Phase mapping included where relevant
+</quality_gate>
+
+<output>
+Write to: .planning/research/PITFALLS.md
+Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
+</output>
+")
+```
+
+**Spawn synthesizer teammate (Wave 2 — blocked until all researchers complete):**
+
+The synthesizer is spawned into the same team. Its task is blocked by all 4 research tasks via `addBlockedBy`, so it will wait until all researchers finish. Unlike fallback mode, the synthesizer can message researchers directly for clarification on gaps or contradictions.
+
+```
+Task(
+  team_name: "gsd-init-{project_slug}",
+  name: "synthesizer",
+  subagent_type: "gsd-research-synthesizer",
+  prompt: "You are the synthesizer on a research team. Check TaskList() for your task — it is blocked until all 4 researchers complete their work.
+
+IMPORTANT — Clarification via messaging: If you find gaps or contradictions in research files, message the specific researcher for clarification BEFORE finalizing SUMMARY.md:
+  SendMessage({ type: 'message', recipient: 'stack-researcher', content: 'Your STACK.md recommends X but ARCHITECTURE.md suggests Y is needed. Which is correct for this project?', summary: 'Research clarification needed' })
+  SendMessage({ type: 'message', recipient: 'features-researcher', content: 'FEATURES.md lists X as table stakes but PITFALLS.md warns against it. Can you clarify the tradeoff?', summary: 'Feature-pitfall conflict' })
+
+Wait for their responses before finalizing SUMMARY.md.
+
+After writing SUMMARY.md, commit ALL research files:
+  node ~/.claude/get-shit-done/bin/gsd-tools.js commit 'docs: complete project research' --files .planning/research/
+
+Then mark your task complete with TaskUpdate.
+
+<task>
+Synthesize research outputs into SUMMARY.md.
+</task>
+
+<research_files>
+Read these files:
+- .planning/research/STACK.md
+- .planning/research/FEATURES.md
+- .planning/research/ARCHITECTURE.md
+- .planning/research/PITFALLS.md
+</research_files>
+
+<output>
+Write to: .planning/research/SUMMARY.md
+Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+</output>
+")
+```
+
+**Orchestrator monitoring in team mode:**
+
+```
+Monitor via TaskList():
+- Poll TaskList() periodically to check task statuses
+- When synthesis_task status becomes "completed", research phase is done
+- Shutdown all teammates gracefully:
+  For each teammate in [stack-researcher, features-researcher, architecture-researcher, pitfalls-researcher, synthesizer]:
+    SendMessage({ type: "shutdown_request", recipient: "{teammate}", content: "Research complete. Please wrap up." })
+    Wait for shutdown_response with approve: true
+  TeamDelete()
+- Display research complete banner (same as current)
+- Continue to Step 7 (Requirements)
+```
+
+**Key behavioral difference in team mode vs fallback:**
+
+| Aspect | Fallback (Parallel Subagents) | Team Mode (Research Team) |
+|--------|-------------------------------|---------------------------|
+| Researcher isolation | Completely isolated | Can message each other via SendMessage |
+| Cross-domain findings | Lost (each writes independently) | Direct message to relevant researcher |
+| Synthesizer clarification | Reads files, guesses at conflicts | Messages specific researchers for clarity |
+| Researcher task order | All parallel (unchanged) | All parallel via independent tasks (no addBlockedBy between them) |
+| Synthesizer dependency | Spawned after all complete | Task dependency via addBlockedBy (auto-waits) |
+| Team cleanup | None (fire-and-forget) | Graceful shutdown + TeamDelete |
+
+---
+
+### 6b. Fallback — If TeamCreate Fails
+
+**If TeamCreate fails — FALLBACK to current parallel subagent mode:**
+
+```
+Agent Teams unavailable. Using parallel subagent mode.
+```
+
 Display spawning indicator:
 ```
 ◆ Spawning 4 researchers in parallel...
@@ -393,7 +761,7 @@ Display spawning indicator:
   → Pitfalls research
 ```
 
-Spawn 4 parallel gsd-project-researcher agents with rich context:
+Spawn 4 parallel gsd-project-researcher agents (fire-and-forget, no team):
 
 ```
 Task(prompt="First, read ~/.claude/agents/gsd-project-researcher.md for your role and instructions.
@@ -557,7 +925,7 @@ Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 ", subagent_type="general-purpose", model="{researcher_model}", description="Pitfalls research")
 ```
 
-After all 4 agents complete, spawn synthesizer to create SUMMARY.md:
+After all 4 agents complete, spawn synthesizer to create SUMMARY.md (no team — standalone subagent):
 
 ```
 Task(prompt="
@@ -580,6 +948,10 @@ Commit after writing.
 </output>
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
 ```
+
+---
+
+### 6c. Research Complete (Both Modes)
 
 Display research complete banner and key findings:
 ```
