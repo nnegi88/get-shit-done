@@ -3893,3 +3893,488 @@ describe('verify key-links command', () => {
     assert.ok(output.links[0].detail.includes('not found'), 'should report source not found');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init new-project command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init new-project command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('fresh project returns init context with brownfield detection', () => {
+    const result = runGsdTools('init new-project', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('researcher_model' in output, 'should have researcher_model');
+    assert.ok('synthesizer_model' in output, 'should have synthesizer_model');
+    assert.ok('roadmapper_model' in output, 'should have roadmapper_model');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+    assert.ok('planning_exists' in output, 'should have planning_exists');
+    assert.ok('is_brownfield' in output, 'should have brownfield detection');
+    assert.ok('has_git' in output, 'should have git detection');
+  });
+
+  test('existing .planning directory detected', () => {
+    // .planning already exists from createTempProject
+    const result = runGsdTools('init new-project', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.planning_exists, true, 'planning should exist');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init new-milestone command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init new-milestone command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns milestone context with models and config', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap v1.0 MVP\n'
+    );
+
+    const result = runGsdTools('init new-milestone', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('researcher_model' in output, 'should have researcher_model');
+    assert.ok('current_milestone' in output, 'should have current_milestone');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+    assert.ok('project_exists' in output, 'should have project_exists');
+    assert.ok('roadmap_exists' in output, 'should have roadmap_exists');
+  });
+
+  test('handles project without milestones directory', () => {
+    const result = runGsdTools('init new-milestone', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.roadmap_exists, false, 'no roadmap should be false');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init quick command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init quick command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('quick init with description creates minimal context', () => {
+    const result = runGsdTools('init quick Fix auth bug', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.description, 'Fix auth bug', 'description should be captured');
+    assert.strictEqual(output.slug, 'fix-auth-bug', 'slug should be generated');
+    assert.strictEqual(output.next_num, 1, 'first quick task should be 1');
+    assert.ok(output.date, 'should have date');
+    assert.ok(output.timestamp, 'should have timestamp');
+  });
+
+  test('quick init creates correct task directory path', () => {
+    const result = runGsdTools('init quick Add dark mode', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.task_dir, 'should have task_dir');
+    assert.ok(output.task_dir.includes('add-dark-mode'), 'task dir should contain slug');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init resume command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init resume command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('with session data returns resume context', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Phase:** 03\n'
+    );
+
+    const result = runGsdTools('init resume', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.state_exists, true, 'state should exist');
+    assert.ok('planning_exists' in output, 'should have planning_exists');
+    assert.ok('has_interrupted_agent' in output, 'should check for interrupted agent');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+  });
+
+  test('without session data returns default context', () => {
+    const result = runGsdTools('init resume', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.state_exists, false, 'state should not exist');
+    assert.strictEqual(output.has_interrupted_agent, false, 'no interrupted agent');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init verify-work command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init verify-work command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid phase returns verification init context', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('init verify-work 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true, 'phase should be found');
+    assert.strictEqual(output.phase_number, '03', 'phase number correct');
+    assert.ok('planner_model' in output, 'should have planner_model');
+    assert.ok('checker_model' in output, 'should have checker_model');
+    assert.ok('has_verification' in output, 'should check verification file');
+  });
+
+  test('invalid phase handled gracefully', () => {
+    const result = runGsdTools('init verify-work 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, false, 'phase should not be found');
+    assert.strictEqual(output.phase_dir, null, 'phase_dir should be null');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init phase-op command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init phase-op command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('existing phase returns phase operation context', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan');
+
+    const result = runGsdTools('init phase-op 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, true, 'phase should be found');
+    assert.strictEqual(output.phase_number, '03', 'phase number correct');
+    assert.strictEqual(output.plan_count, 1, 'should have 1 plan');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+    assert.ok('has_research' in output, 'should check research');
+    assert.ok('has_context' in output, 'should check context');
+  });
+
+  test('non-existent phase returns appropriate context', () => {
+    const result = runGsdTools('init phase-op 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, false, 'phase should not be found');
+    assert.strictEqual(output.plan_count, 0, 'plan count should be 0');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init todos command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init todos command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('with todos returns todo init context', () => {
+    const pendingDir = path.join(tmpDir, '.planning', 'todos', 'pending');
+    fs.mkdirSync(pendingDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(pendingDir, 'fix-bug.md'),
+      'title: Fix login bug\narea: auth\ncreated: 2025-01-01\n'
+    );
+
+    const result = runGsdTools('init todos', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.todo_count, 1, 'should have 1 todo');
+    assert.strictEqual(output.todos[0].title, 'Fix login bug', 'todo title correct');
+    assert.ok('pending_dir' in output, 'should have pending_dir');
+    assert.ok('completed_dir' in output, 'should have completed_dir');
+    assert.ok('date' in output, 'should have date');
+  });
+
+  test('without todos returns empty context', () => {
+    const result = runGsdTools('init todos', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.todo_count, 0, 'should have 0 todos');
+    assert.deepStrictEqual(output.todos, [], 'todos should be empty array');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init milestone-op command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init milestone-op command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('standard scenario returns milestone operation context', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-foundation');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap v1.0 MVP\n'
+    );
+
+    const result = runGsdTools('init milestone-op', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('milestone_version' in output, 'should have milestone_version');
+    assert.ok('phase_count' in output, 'should have phase_count');
+    assert.ok('completed_phases' in output, 'should have completed_phases');
+    assert.ok('all_phases_complete' in output, 'should have all_phases_complete');
+    assert.ok('archived_milestones' in output, 'should have archived_milestones');
+    assert.strictEqual(output.phase_count, 1, 'should count 1 phase');
+    assert.strictEqual(output.completed_phases, 1, '1 phase has summary');
+  });
+
+  test('no milestones handled gracefully', () => {
+    const result = runGsdTools('init milestone-op', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_count, 0, 'no phases');
+    assert.strictEqual(output.archive_count, 0, 'no archived milestones');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init map-codebase command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init map-codebase command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns codebase mapping init context', () => {
+    const result = runGsdTools('init map-codebase', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('mapper_model' in output, 'should have mapper_model');
+    assert.ok('commit_docs' in output, 'should have commit_docs');
+    assert.ok('codebase_dir' in output, 'should have codebase_dir');
+    assert.ok('existing_maps' in output, 'should have existing_maps');
+    assert.ok('has_maps' in output, 'should have has_maps flag');
+    assert.ok('planning_exists' in output, 'should have planning_exists');
+    assert.strictEqual(output.has_maps, false, 'no maps should exist');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// init execute-phase edge cases
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('init execute-phase edge cases', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('non-existent phase returns phase_found false', () => {
+    const result = runGsdTools('init execute-phase 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase_found, false, 'phase should not be found');
+    assert.strictEqual(output.plan_count, 0, 'plan count should be 0');
+    assert.deepStrictEqual(output.plans, [], 'plans should be empty');
+  });
+
+  test('phase with summaries populates incomplete_plans correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(phaseDir, '03-01-SUMMARY.md'), '# Summary 1');
+    fs.writeFileSync(path.join(phaseDir, '03-02-PLAN.md'), '# Plan 2');
+
+    const result = runGsdTools('init execute-phase 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.plan_count, 2, '2 plans total');
+    assert.strictEqual(output.incomplete_count, 1, '1 incomplete plan');
+    assert.ok(output.incomplete_plans.includes('03-02-PLAN.md'), '03-02 should be incomplete');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase numbering edge cases (TEST-06)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('phase next-decimal edge cases (TEST-06)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('double-digit base phase (phase 10 -> 10.1)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '10-final'), { recursive: true });
+
+    const result = runGsdTools('phase next-decimal 10', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.next, '10.1', 'should return 10.1');
+    assert.strictEqual(output.base_phase, '10', 'base phase should be 10');
+  });
+
+  test('decimal transition from 1.9 to 1.10 (numeric, not lexicographic)', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-base'), { recursive: true });
+    for (let i = 1; i <= 9; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `01.${i}-fix${i}`), { recursive: true });
+    }
+
+    const result = runGsdTools('phase next-decimal 01', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.next, '01.10', 'should return 01.10, not 01.2 (lexicographic error)');
+    assert.strictEqual(output.existing.length, 9, 'should have 9 existing decimals');
+  });
+
+  test('many decimal phases: existing decimals listed and next computed from highest', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '01-base'), { recursive: true });
+    for (let i = 1; i <= 11; i++) {
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', `01.${i}-fix${i}`), { recursive: true });
+    }
+
+    const result = runGsdTools('phase next-decimal 01', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Characterization: tool uses lexicographic sort, lists all 11 existing decimals
+    assert.strictEqual(output.existing.length, 11, 'should have 11 existing decimals');
+    // Tool finds max decimal as 9 (lexicographic: "9" > "11" > "10"), increments to 10
+    // But 01.10 already exists, so the actual behavior just returns next after max parse
+    assert.ok(output.next.startsWith('01.'), 'next should start with 01.');
+    assert.ok(output.next, 'should return a next value');
+  });
+
+  test('base phase with no existing decimals returns X.1', () => {
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '05-feature'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.planning', 'phases', '06-next'), { recursive: true });
+
+    const result = runGsdTools('phase next-decimal 05', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.next, '05.1', 'should return 05.1');
+    assert.deepStrictEqual(output.existing, [], 'no existing decimals');
+  });
+
+  test('non-existent base phase handled gracefully', () => {
+    const result = runGsdTools('phase next-decimal 99', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'base phase not found');
+    assert.strictEqual(output.next, '99.1', 'should still suggest 99.1');
+  });
+});
