@@ -2987,3 +2987,909 @@ describe('state record-session command', () => {
     assert.ok(content.includes('Completed 01-02'), 'stopped at should be updated');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// frontmatter get command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('frontmatter get command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('extracts specific field from valid frontmatter', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-file.md'),
+      `---
+phase: 01-foundation
+plan: 01
+subsystem: testing
+tags: [node, jest]
+---
+
+# Content
+`
+    );
+
+    const result = runGsdTools(`frontmatter get test-file.md --field phase`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase, '01-foundation', 'should extract phase field');
+  });
+
+  test('returns all frontmatter when no field specified', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-file.md'),
+      `---
+phase: 02-api
+plan: 03
+subsystem: api
+---
+
+# Content
+`
+    );
+
+    const result = runGsdTools('frontmatter get test-file.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.phase, '02-api', 'phase field present');
+    assert.strictEqual(output.plan, '03', 'plan field present');
+    assert.strictEqual(output.subsystem, 'api', 'subsystem field present');
+  });
+
+  test('handles missing file gracefully', () => {
+    const result = runGsdTools('frontmatter get nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should succeed with error JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// frontmatter set command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('frontmatter set command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('sets field value in existing frontmatter', () => {
+    const filePath = path.join(tmpDir, 'test-file.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+plan: 01
+---
+
+# Body
+`
+    );
+
+    const result = runGsdTools('frontmatter set test-file.md --field subsystem --value testing', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should report updated');
+    assert.strictEqual(output.field, 'subsystem', 'field name correct');
+    assert.strictEqual(output.value, 'testing', 'value correct');
+
+    // Verify file was written
+    const content = fs.readFileSync(filePath, 'utf-8');
+    assert.ok(content.includes('subsystem'), 'file should contain new field');
+  });
+
+  test('handles missing file gracefully', () => {
+    const result = runGsdTools('frontmatter set nonexistent.md --field x --value y', tmpDir);
+    assert.ok(result.success, `Command should succeed with error JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+
+  test('preserves body content after frontmatter', () => {
+    const filePath = path.join(tmpDir, 'test-file.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+---
+
+# Important Content
+
+This body must be preserved.
+`
+    );
+
+    runGsdTools('frontmatter set test-file.md --field plan --value 02', tmpDir);
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    assert.ok(content.includes('Important Content'), 'body content should be preserved');
+    assert.ok(content.includes('This body must be preserved'), 'full body preserved');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// frontmatter merge command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('frontmatter merge command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('merges JSON fields into existing frontmatter', () => {
+    const filePath = path.join(tmpDir, 'test-file.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+plan: 01
+---
+
+# Content
+`
+    );
+
+    const mergeData = JSON.stringify({ subsystem: 'testing', tags: ['node', 'jest'] });
+    const result = runGsdTools(`frontmatter merge test-file.md --data '${mergeData}'`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.merged, true, 'should report merged');
+    assert.ok(output.fields.includes('subsystem'), 'subsystem in merged fields');
+    assert.ok(output.fields.includes('tags'), 'tags in merged fields');
+  });
+
+  test('handles missing file gracefully', () => {
+    const mergeData = JSON.stringify({ key: 'value' });
+    const result = runGsdTools(`frontmatter merge nonexistent.md --data '${mergeData}'`, tmpDir);
+    assert.ok(result.success, `Command should succeed with error JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+
+  test('overwrites existing fields with merge data', () => {
+    const filePath = path.join(tmpDir, 'test-file.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+subsystem: old-value
+---
+
+# Content
+`
+    );
+
+    const mergeData = JSON.stringify({ subsystem: 'new-value' });
+    runGsdTools(`frontmatter merge test-file.md --data '${mergeData}'`, tmpDir);
+
+    // Verify by reading back
+    const getResult = runGsdTools('frontmatter get test-file.md --field subsystem', tmpDir);
+    const output = JSON.parse(getResult.output);
+    assert.strictEqual(output.subsystem, 'new-value', 'subsystem should be overwritten');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// frontmatter validate command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('frontmatter validate command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid plan frontmatter passes validation', () => {
+    const filePath = path.join(tmpDir, 'test-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+files_modified: [src/test.js]
+autonomous: true
+must_haves:
+  truths: []
+  artifacts: []
+  key_links: []
+---
+
+# Plan
+`
+    );
+
+    const result = runGsdTools('frontmatter validate test-plan.md --schema plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'should be valid');
+    assert.strictEqual(output.schema, 'plan', 'schema should be plan');
+    assert.strictEqual(output.missing.length, 0, 'no missing fields');
+  });
+
+  test('valid summary frontmatter passes validation', () => {
+    const filePath = path.join(tmpDir, 'test-summary.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+plan: 01
+subsystem: testing
+tags: [node]
+duration: 5min
+completed: 2025-01-01
+---
+
+# Summary
+`
+    );
+
+    const result = runGsdTools('frontmatter validate test-summary.md --schema summary', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'should be valid');
+    assert.strictEqual(output.schema, 'summary', 'schema should be summary');
+  });
+
+  test('missing required fields returns validation errors', () => {
+    const filePath = path.join(tmpDir, 'test-incomplete.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+---
+
+# Incomplete Plan
+`
+    );
+
+    const result = runGsdTools('frontmatter validate test-incomplete.md --schema plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should not be valid');
+    assert.ok(output.missing.length > 0, 'should have missing fields');
+    assert.ok(output.missing.includes('plan'), 'plan should be missing');
+    assert.ok(output.missing.includes('type'), 'type should be missing');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// template select command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('template select command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('simple plan returns standard template identifier', () => {
+    const filePath = path.join(tmpDir, 'test-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+plan: 01
+---
+
+### Task 1: Create schema
+### Task 2: Generate client
+### Task 3: Write tests
+
+Files: \`src/db.ts\`, \`src/schema.ts\`, \`src/client.ts\`, \`tests/db.test.ts\`
+`
+    );
+
+    const result = runGsdTools('template select test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.template, 'should return template path');
+    assert.ok(output.type, 'should return type');
+    assert.strictEqual(output.taskCount, 3, 'should count 3 tasks');
+  });
+
+  test('complex plan with decisions returns complex template', () => {
+    const filePath = path.join(tmpDir, 'complex-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01
+plan: 01
+---
+
+### Task 1: Setup
+### Task 2: Auth
+### Task 3: API
+### Task 4: Tests
+### Task 5: Deploy
+### Task 6: Monitor
+
+We need to make a decision about the auth provider.
+Files: \`src/a.ts\`, \`src/b.ts\`, \`src/c.ts\`, \`src/d.ts\`, \`src/e.ts\`, \`src/f.ts\`, \`src/g.ts\`
+`
+    );
+
+    const result = runGsdTools('template select complex-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.type, 'complex', 'should return complex type');
+    assert.strictEqual(output.hasDecisions, true, 'should detect decisions');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// template fill summary command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('template fill summary command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('fills summary template with provided field values', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('template fill summary --phase 3 --plan 01 --name API', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create summary template');
+    assert.ok(output.path, 'should return file path');
+
+    // Verify file was created
+    const files = fs.readdirSync(phaseDir);
+    assert.ok(files.some(f => f.endsWith('-SUMMARY.md')), 'summary file should exist');
+  });
+
+  test('returns error if file already exists', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Create first
+    runGsdTools('template fill summary --phase 3 --plan 01 --name API', tmpDir);
+
+    // Try again
+    const result = runGsdTools('template fill summary --phase 3 --plan 01 --name API', tmpDir);
+    assert.ok(result.success, `Command should succeed with error JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File already exists', 'should report file already exists');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// template fill plan command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('template fill plan command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('execute type plan fills correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('template fill plan --phase 3 --plan 01 --name API --type execute', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create plan template');
+
+    // Verify file content
+    const files = fs.readdirSync(phaseDir);
+    const planFile = files.find(f => f.endsWith('-PLAN.md'));
+    assert.ok(planFile, 'plan file should exist');
+
+    const content = fs.readFileSync(path.join(phaseDir, planFile), 'utf-8');
+    assert.ok(content.includes('type: execute'), 'should contain execute type');
+  });
+
+  test('tdd type plan fills correctly', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('template fill plan --phase 3 --plan 02 --name Tests --type tdd', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create plan template');
+
+    const files = fs.readdirSync(phaseDir);
+    const planFile = files.find(f => f.includes('02') && f.endsWith('-PLAN.md'));
+    assert.ok(planFile, 'tdd plan file should exist');
+
+    const content = fs.readFileSync(path.join(phaseDir, planFile), 'utf-8');
+    assert.ok(content.includes('type: tdd'), 'should contain tdd type');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// template fill verification command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('template fill verification command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('fills verification template with fields', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('template fill verification --phase 3 --name API', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.created, true, 'should create verification template');
+
+    const files = fs.readdirSync(phaseDir);
+    assert.ok(files.some(f => f.endsWith('-VERIFICATION.md')), 'verification file should exist');
+  });
+
+  test('returns error if file already exists', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    // Create first
+    runGsdTools('template fill verification --phase 3 --name API', tmpDir);
+
+    // Try again
+    const result = runGsdTools('template fill verification --phase 3 --name API', tmpDir);
+    assert.ok(result.success, `Command should succeed with error JSON: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File already exists', 'should report already exists');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify plan-structure command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify plan-structure command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid plan with tasks passes', () => {
+    const filePath = path.join(tmpDir, 'test-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+files_modified: []
+autonomous: true
+must_haves:
+  truths: []
+  artifacts: []
+  key_links: []
+---
+
+<task type="auto">
+  <name>Task 1: Do something</name>
+  <files>src/test.js</files>
+  <action>Create the file</action>
+  <verify>File exists</verify>
+  <done>File created</done>
+</task>
+`
+    );
+
+    const result = runGsdTools('verify plan-structure test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'should be valid');
+    assert.strictEqual(output.task_count, 1, 'should have 1 task');
+    assert.strictEqual(output.errors.length, 0, 'no errors');
+  });
+
+  test('plan missing required fields returns errors', () => {
+    const filePath = path.join(tmpDir, 'test-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+---
+
+<task type="auto">
+  <name>Task 1</name>
+  <action>Do something</action>
+</task>
+`
+    );
+
+    const result = runGsdTools('verify plan-structure test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should not be valid');
+    assert.ok(output.errors.length > 0, 'should have errors');
+    assert.ok(output.errors.some(e => e.includes('Missing required')), 'should mention missing fields');
+  });
+
+  test('plan with no tasks returns warnings', () => {
+    const filePath = path.join(tmpDir, 'test-plan.md');
+    fs.writeFileSync(
+      filePath,
+      `---
+phase: 01-test
+plan: 01
+type: execute
+wave: 1
+depends_on: []
+files_modified: []
+autonomous: true
+must_haves:
+  truths: []
+---
+
+# Just a heading, no tasks
+`
+    );
+
+    const result = runGsdTools('verify plan-structure test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.task_count, 0, 'should have 0 tasks');
+    assert.ok(output.warnings.some(w => w.includes('No <task> elements')), 'should warn about no tasks');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify phase-completeness command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify phase-completeness command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('complete phase (all summaries exist) passes', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(phaseDir, '03-01-SUMMARY.md'), '# Summary 1');
+    fs.writeFileSync(path.join(phaseDir, '03-02-PLAN.md'), '# Plan 2');
+    fs.writeFileSync(path.join(phaseDir, '03-02-SUMMARY.md'), '# Summary 2');
+
+    const result = runGsdTools('verify phase-completeness 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.complete, true, 'phase should be complete');
+    assert.strictEqual(output.plan_count, 2, '2 plans');
+    assert.strictEqual(output.summary_count, 2, '2 summaries');
+    assert.strictEqual(output.incomplete_plans.length, 0, 'no incomplete plans');
+  });
+
+  test('incomplete phase (missing summaries) returns incomplete items', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '# Plan 1');
+    fs.writeFileSync(path.join(phaseDir, '03-01-SUMMARY.md'), '# Summary 1');
+    fs.writeFileSync(path.join(phaseDir, '03-02-PLAN.md'), '# Plan 2');
+    // No summary for plan 2
+
+    const result = runGsdTools('verify phase-completeness 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.complete, false, 'phase should be incomplete');
+    assert.ok(output.incomplete_plans.includes('03-02'), 'should list 03-02 as incomplete');
+  });
+
+  test('empty phase directory returns complete (no plans to complete)', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+
+    const result = runGsdTools('verify phase-completeness 03', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.complete, true, 'empty phase is trivially complete');
+    assert.strictEqual(output.plan_count, 0, '0 plans');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify references command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify references command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid @-references all resolve', () => {
+    // Create referenced files
+    fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# State');
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap'
+    );
+
+    // Create file with references
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-file.md'),
+      `# Plan
+
+@.planning/STATE.md
+@.planning/ROADMAP.md
+`
+    );
+
+    const result = runGsdTools('verify references test-file.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'all references should resolve');
+    assert.strictEqual(output.missing.length, 0, 'no missing references');
+    assert.strictEqual(output.found, 2, '2 found references');
+  });
+
+  test('broken references detected', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-file.md'),
+      `# Plan
+
+@.planning/STATE.md
+@.planning/NONEXISTENT.md
+`
+    );
+    // STATE.md doesn't exist in tmpDir either
+
+    const result = runGsdTools('verify references test-file.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, false, 'should be invalid');
+    assert.ok(output.missing.length > 0, 'should have missing references');
+  });
+
+  test('file with no references passes cleanly', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-file.md'),
+      `# Simple File
+
+No references here, just plain text.
+`
+    );
+
+    const result = runGsdTools('verify references test-file.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.valid, true, 'no references = valid');
+    assert.strictEqual(output.total, 0, 'total should be 0');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify commits command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify commits command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    // Initialize git repo for commit verification
+    execSync('git init && git config user.email "test@test.com" && git config user.name "Test"', { cwd: tmpDir, stdio: 'pipe' });
+    fs.writeFileSync(path.join(tmpDir, 'init.txt'), 'initial');
+    execSync('git add init.txt && git commit -m "initial commit"', { cwd: tmpDir, stdio: 'pipe' });
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid commit hash returns success', () => {
+    const hash = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf-8' }).trim();
+
+    const result = runGsdTools(`verify commits ${hash}`, tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_valid, true, 'all commits should be valid');
+    assert.strictEqual(output.valid.length, 1, '1 valid commit');
+    assert.strictEqual(output.invalid.length, 0, 'no invalid commits');
+  });
+
+  test('invalid commit hash returns failure', () => {
+    const result = runGsdTools('verify commits 0000000000000000000000000000000000000000', tmpDir);
+    assert.ok(result.success, `Command should succeed with invalid data: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_valid, false, 'should not be all valid');
+    assert.strictEqual(output.invalid.length, 1, '1 invalid commit');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify artifacts command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify artifacts command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('all listed artifacts exist passes', () => {
+    // Create the artifact file
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'test.js'), 'module.exports = {};\n'.repeat(50));
+
+    // Create plan with must_haves.artifacts (4-space indent for parseMustHavesBlock)
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\nmust_haves:\n    artifacts:\n      - path: "src/test.js"\n        provides: "Test module"\n        min_lines: 10\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify artifacts test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_passed, true, 'all artifacts should pass');
+    assert.strictEqual(output.passed, 1, '1 artifact passed');
+  });
+
+  test('missing artifacts listed', () => {
+    // 4-space indent for parseMustHavesBlock
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\nmust_haves:\n    artifacts:\n      - path: "src/nonexistent.js"\n        provides: "Missing module"\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify artifacts test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_passed, false, 'should not pass');
+    assert.ok(output.artifacts[0].issues.includes('File not found'), 'should report file not found');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// verify key-links command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verify key-links command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('valid key links pass verification', () => {
+    // Create source and target files
+    fs.mkdirSync(path.join(tmpDir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'src', 'main.js'), 'const db = require("./db");\n');
+    fs.writeFileSync(path.join(tmpDir, 'src', 'db.js'), 'module.exports = {};\n');
+
+    // 4-space indent for parseMustHavesBlock
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\nmust_haves:\n    key_links:\n      - from: "src/main.js"\n        to: "src/db.js"\n        via: "require import"\n        pattern: "require"\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify key-links test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_verified, true, 'all links should be verified');
+    assert.strictEqual(output.verified, 1, '1 link verified');
+  });
+
+  test('broken key links detected', () => {
+    // 4-space indent for parseMustHavesBlock
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\nmust_haves:\n    key_links:\n      - from: "src/nonexistent.js"\n        to: "src/db.js"\n        via: "import"\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify key-links test-plan.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.all_verified, false, 'should not be all verified');
+    assert.ok(output.links[0].detail.includes('not found'), 'should report source not found');
+  });
+});
