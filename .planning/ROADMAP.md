@@ -71,11 +71,14 @@ Plans:
   3. Running any command with invalid input (bad phase numbers, malformed JSON, invalid field names) produces a specific rejection message instead of silent failure or stack trace
   4. File path arguments that traverse outside the project root or follow symlinks out of scope are rejected with an explanatory error
   5. User-provided strings used in RegExp are escaped, and JSON.parse results are sanitized against prototype pollution before use
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- Error class hierarchy (GsdError + subclasses) and POSIX exit codes
+- [ ] 02-02-PLAN.md -- Security utilities: RegExp escaping, JSON sanitization, path validation
+- [ ] 02-03-PLAN.md -- Empty catch block audit and classification (30 blocks)
+- [ ] 02-04-PLAN.md -- Input validation for all command handlers
+- [ ] 02-05-PLAN.md -- Integration tests for all Phase 2 changes
 
 ### Phase 3: Monolith Decomposition
 **Goal**: The 4,600-line gsd-tools.js and 1,740-line install.js are decomposed into focused modules that can be tested and maintained independently
