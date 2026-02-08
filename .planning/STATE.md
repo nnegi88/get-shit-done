@@ -35,6 +35,7 @@ Progress: [████████░░] 64%
 - Trend: Accelerating
 
 *Updated after each plan completion*
+| Phase 01.1 P02 | 6 min | 2 tasks | 2 files |
 | Phase 01.1 P03 | 4 min | 2 tasks | 2 files |
 
 ## Accumulated Context
@@ -60,6 +61,9 @@ Recent decisions affecting current work:
 - [01.1-01]: Append-only approach for agent updates -- existing content untouched, protocol added after last section
 - [01.1-01]: In-process teammate mode over tmux for no external dependency
 - [01.1-01]: Standalone agents get base protocol with note rather than being skipped
+- [01.1-02]: Unified step 8 for both team and fallback paths -- single branching point after TeamCreate attempt
+- [01.1-02]: Planner and checker self-manage revision loop in team mode via SendMessage with orchestrator monitoring via TaskList
+- [01.1-02]: Checker reports final status via task completion message (VERIFICATION PASSED or ISSUES REMAIN)
 - [01.1-04]: Preserved original Step 6 verbatim as fallback -- zero behavioral change when teams unavailable
 - [01.1-04]: Direct SendMessage over broadcast for researcher cross-pollination -- targeted by domain
 - [01.1-04]: Synthesizer as teammate with addBlockedBy rather than sequential spawn-after-complete
