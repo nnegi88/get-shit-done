@@ -279,7 +279,7 @@ function loadConfig(cwd) {
 
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');
-    const parsed = JSON.parse(raw);
+    const parsed = sanitizeJson(JSON.parse(raw));
 
     const get = (key, nested) => {
       if (parsed[key] !== undefined) return parsed[key];
@@ -649,9 +649,11 @@ function cmdListTodos(cwd, area, raw) {
           area: todoArea,
           path: path.join('.planning', 'todos', 'pending', file),
         });
-      } catch {}
+      } catch (e) { // Intentional: skip unreadable todo file -- continues to next file
+      }
     }
-  } catch {}
+  } catch (e) { // Intentional: pending todos dir may not exist -- returns empty list
+  }
 
   const result = { count, todos };
   output(result, raw, count.toString());
@@ -743,7 +745,7 @@ function cmdConfigSet(cwd, keyPath, value, raw) {
   let config = {};
   try {
     if (fs.existsSync(configPath)) {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      config = sanitizeJson(JSON.parse(fs.readFileSync(configPath, 'utf-8')));
     }
   } catch (err) {
     error('Failed to read config.json: ' + err.message, EXIT_CONFIG);
@@ -2192,7 +2194,7 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   const content = fs.readFileSync(fullPath, 'utf-8');
   const fm = extractFrontmatter(content);
   let parsedValue;
-  try { parsedValue = JSON.parse(value); } catch { parsedValue = value; }
+  try { parsedValue = sanitizeJson(JSON.parse(value)); } catch { parsedValue = value; }
   fm[field] = parsedValue;
   const newContent = spliceFrontmatter(content, fm);
   fs.writeFileSync(fullPath, newContent, 'utf-8');
