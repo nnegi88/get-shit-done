@@ -13,7 +13,7 @@ This roadmap delivers a systematic hardening pass across the GSD CLI codebase, o
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Safety Net** - Capture current behavior across all commands and runtimes before any code changes
-- [ ] **Phase 01.1: Migrate GSD from Subagents to Agent Teams (INSERTED)** - Replace fire-and-forget subagent spawning with Agent Teams orchestration
+- [x] **Phase 01.1: Migrate GSD from Subagents to Agent Teams (INSERTED)** - Replace fire-and-forget subagent spawning with Agent Teams orchestration
 - [ ] **Phase 2: Error Handling & Security** - Make failures visible and inputs validated with structured errors and security hardening
 - [ ] **Phase 3: Monolith Decomposition** - Break gsd-tools.js and install.js into focused modules with lazy-loading registry
 - [ ] **Phase 4: Data Integrity** - Protect state files with atomic writes, signal handling, file locking, and backups
@@ -55,11 +55,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 01.1-01-PLAN.md -- Foundation: Team Communication Protocol for all 11 agent definitions + settings.json configuration
-- [ ] 01.1-02-PLAN.md -- plan-phase.md workflow migration (researcher-planner-checker team with direct messaging + fallback)
-- [ ] 01.1-03-PLAN.md -- execute-phase.md + execute-plan.md workflow migration (wave-based executor team + verifier querying + fallback)
-- [ ] 01.1-04-PLAN.md -- new-project.md workflow migration (research team with cross-pollination + fallback)
-- [ ] 01.1-05-PLAN.md -- Debug team workflow (competing hypotheses) + integration verification of all GSD guarantees
+- [x] 01.1-01-PLAN.md -- Foundation: Team Communication Protocol for all 11 agent definitions + settings.json configuration
+- [x] 01.1-02-PLAN.md -- plan-phase.md workflow migration (researcher-planner-checker team with direct messaging + fallback)
+- [x] 01.1-03-PLAN.md -- execute-phase.md + execute-plan.md workflow migration (wave-based executor team + verifier querying + fallback)
+- [x] 01.1-04-PLAN.md -- new-project.md workflow migration (research team with cross-pollination + fallback)
+- [x] 01.1-05-PLAN.md -- Debug team workflow (competing hypotheses) + integration verification of all GSD guarantees
 
 ### Phase 2: Error Handling & Security
 **Goal**: Users get clear error messages on bad input, failures are visible instead of silent, and all inputs are validated against security threats
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 -> 01.1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Safety Net | 4/4 | ✓ Complete | 2026-02-08 |
-| 01.1. Migrate to Agent Teams | 0/5 | Planned | - |
+| 01.1. Migrate to Agent Teams | 5/5 | ✓ Complete | 2026-02-09 |
 | 2. Error Handling & Security | 0/0 | Not started | - |
 | 3. Monolith Decomposition | 0/0 | Not started | - |
 | 4. Data Integrity | 0/0 | Not started | - |
@@ -153,4 +153,4 @@ Phases execute in numeric order: 1 -> 01.1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-09 (Phase 01.1 planned)*
+*Last updated: 2026-02-09 (Phase 01.1 complete)*
