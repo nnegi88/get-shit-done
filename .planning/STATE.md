@@ -38,6 +38,7 @@ Progress: [██████████] 73%
 | Phase 01.1 P02 | 6 min | 2 tasks | 2 files |
 | Phase 01.1 P03 | 4 min | 2 tasks | 2 files |
 | Phase 01.1 P05 | 3 min | 2 tasks | 1 files |
+| Phase 02 P02 | 18min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - [01.1-05]: All 12 GSD guarantees verified as preserved across the entire 4-workflow migration
 - [02-01]: Inline error classes in gsd-tools.js following existing monolith pattern -- Phase 3 will extract
 - [02-01]: EXIT_USAGE for missing args/unknown subcommands, EXIT_CONFIG for missing planning files, EXIT_FILESYSTEM for missing user paths
+- [Phase 02]: Duplicated sanitizeJson in install.js -- Phase 3 decomposition will extract to shared module
+- [Phase 02]: validatePath only applied to user-facing commands, not internal path construction
 
 ### Roadmap Evolution
 
