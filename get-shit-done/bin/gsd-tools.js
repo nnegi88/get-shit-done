@@ -931,6 +931,8 @@ function cmdPhasesList(cwd, options, raw) {
 }
 
 function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
+  const phaseErr = validatePhaseNumber(phaseNum);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
 
   if (!fs.existsSync(roadmapPath)) {
@@ -989,6 +991,8 @@ function cmdRoadmapGetPhase(cwd, phaseNum, raw) {
 }
 
 function cmdPhaseNextDecimal(cwd, basePhase, raw) {
+  const phaseErr = validatePhaseNumber(basePhase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(basePhase);
 
@@ -1064,7 +1068,8 @@ function cmdStateLoad(cwd, raw) {
   let stateRaw = '';
   try {
     stateRaw = fs.readFileSync(path.join(planningDir, 'STATE.md'), 'utf-8');
-  } catch {}
+  } catch (e) { // Intentional: STATE.md may not exist -- returns empty string as default
+  }
 
   const configExists = fs.existsSync(path.join(planningDir, 'config.json'));
   const roadmapExists = fs.existsSync(path.join(planningDir, 'ROADMAP.md'));
@@ -1103,10 +1108,14 @@ function cmdStateLoad(cwd, raw) {
 }
 
 function cmdStateGet(cwd, section, raw) {
+  if (section) {
+    const fieldErr = validateFieldName(section);
+    if (fieldErr) { error(fieldErr, EXIT_USAGE); }
+  }
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
     const content = fs.readFileSync(statePath, 'utf-8');
-    
+
     if (!section) {
       output({ content }, raw, content);
       return;
@@ -1138,6 +1147,10 @@ function cmdStateGet(cwd, section, raw) {
 }
 
 function cmdStatePatch(cwd, patches, raw) {
+  for (const key of Object.keys(patches)) {
+    const fieldErr = validateFieldName(key);
+    if (fieldErr) { error(fieldErr, EXIT_USAGE); }
+  }
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
     let content = fs.readFileSync(statePath, 'utf-8');
@@ -1169,6 +1182,8 @@ function cmdStateUpdate(cwd, field, value) {
   if (!field || value === undefined) {
     error('field and value required for state update', EXIT_USAGE);
   }
+  const fieldErr = validateFieldName(field);
+  if (fieldErr) { error(fieldErr, EXIT_USAGE); }
 
   const statePath = path.join(cwd, '.planning', 'STATE.md');
   try {
@@ -1443,9 +1458,8 @@ function cmdResolveModel(cwd, agentType, raw) {
 }
 
 function cmdFindPhase(cwd, phase, raw) {
-  if (!phase) {
-    error('phase identifier required', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phase);
@@ -1540,6 +1554,8 @@ function cmdVerifySummary(cwd, summaryPath, checkFileCount, raw) {
   }
 
   const fullPath = path.join(cwd, summaryPath);
+  const pathCheck = validatePath(fullPath, cwd);
+  if (!pathCheck.valid) { error(pathCheck.error, EXIT_FILESYSTEM); return; }
   const checkCount = checkFileCount || 2;
 
   // Check 1: Summary exists
@@ -1843,9 +1859,8 @@ function cmdTemplateFill(cwd, templateType, options, raw) {
 }
 
 function cmdPhasePlanIndex(cwd, phase, raw) {
-  if (!phase) {
-    error('phase required for phase-plan-index', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const phasesDir = path.join(cwd, '.planning', 'phases');
   const normalized = normalizePhaseName(phase);
@@ -2174,7 +2189,13 @@ async function cmdWebsearch(query, options, raw) {
 
 function cmdFrontmatterGet(cwd, filePath, field, raw) {
   if (!filePath) { error('file path required', EXIT_USAGE); }
+  if (field) {
+    const fieldErr = validateFieldName(field);
+    if (fieldErr) { error(fieldErr, EXIT_USAGE); }
+  }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  const pathCheck = validatePath(fullPath, cwd);
+  if (!pathCheck.valid) { error(pathCheck.error, EXIT_FILESYSTEM); return; }
   const content = safeReadFile(fullPath);
   if (!content) { output({ error: 'File not found', path: filePath }, raw); return; }
   const fm = extractFrontmatter(content);
@@ -2189,7 +2210,15 @@ function cmdFrontmatterGet(cwd, filePath, field, raw) {
 
 function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
   if (!filePath || !field || value === undefined) { error('file, field, and value required', EXIT_USAGE); }
+  const fieldErr = validateFieldName(field);
+  if (fieldErr) { error(fieldErr, EXIT_USAGE); }
+  if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+    const jsonErr = validateJsonString(value, '--value');
+    if (jsonErr) { error(jsonErr, EXIT_USAGE); }
+  }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  const pathCheck = validatePath(fullPath, cwd);
+  if (!pathCheck.valid) { error(pathCheck.error, EXIT_FILESYSTEM); return; }
   if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
   const content = fs.readFileSync(fullPath, 'utf-8');
   const fm = extractFrontmatter(content);
@@ -2203,12 +2232,16 @@ function cmdFrontmatterSet(cwd, filePath, field, value, raw) {
 
 function cmdFrontmatterMerge(cwd, filePath, data, raw) {
   if (!filePath || !data) { error('file and data required', EXIT_USAGE); }
+  const jsonErr = validateJsonString(data, '--data');
+  if (jsonErr) { error(jsonErr, EXIT_USAGE); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  const pathCheck = validatePath(fullPath, cwd);
+  if (!pathCheck.valid) { error(pathCheck.error, EXIT_FILESYSTEM); return; }
   if (!fs.existsSync(fullPath)) { output({ error: 'File not found', path: filePath }, raw); return; }
   const content = fs.readFileSync(fullPath, 'utf-8');
   const fm = extractFrontmatter(content);
   let mergeData;
-  try { mergeData = JSON.parse(data); } catch { error('Invalid JSON for --data', EXIT_USAGE); return; }
+  try { mergeData = sanitizeJson(JSON.parse(data)); } catch { error('Invalid JSON for --data', EXIT_USAGE); return; }
   Object.assign(fm, mergeData);
   const newContent = spliceFrontmatter(content, fm);
   fs.writeFileSync(fullPath, newContent, 'utf-8');
@@ -2298,7 +2331,8 @@ function cmdVerifyPlanStructure(cwd, filePath, raw) {
 }
 
 function cmdVerifyPhaseCompleteness(cwd, phase, raw) {
-  if (!phase) { error('phase required', EXIT_USAGE); }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
   const phaseInfo = findPhaseInternal(cwd, phase);
   if (!phaseInfo || !phaseInfo.found) {
     output({ error: 'Phase not found', phase }, raw);
@@ -2347,6 +2381,8 @@ function cmdVerifyPhaseCompleteness(cwd, phase, raw) {
 function cmdVerifyReferences(cwd, filePath, raw) {
   if (!filePath) { error('file path required', EXIT_USAGE); }
   const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
+  const pathCheck = validatePath(fullPath, cwd);
+  if (!pathCheck.valid) { error(pathCheck.error, EXIT_FILESYSTEM); return; }
   const content = safeReadFile(fullPath);
   if (!content) { output({ error: 'File not found', path: filePath }, raw); return; }
 
@@ -2588,7 +2624,8 @@ function cmdRoadmapAnalyze(cwd, raw) {
         else if (hasContext) diskStatus = 'discussed';
         else diskStatus = 'empty';
       }
-    } catch {}
+    } catch (e) { // Intentional: phases dir may not exist -- defaults to 'no_directory' status
+    }
 
     // Check ROADMAP checkbox status
     const checkboxPattern = new RegExp(`-\\s*\\[(x| )\\]\\s*.*Phase\\s+${escapeRegExp(phaseNum)}`, 'i');
@@ -2707,6 +2744,8 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
   if (!afterPhase || !description) {
     error('after-phase and description required for phase insert', EXIT_USAGE);
   }
+  const phaseErr = validatePhaseNumber(afterPhase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   if (!fs.existsSync(roadmapPath)) {
@@ -2736,7 +2775,8 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
       const dm = dir.match(decimalPattern);
       if (dm) existingDecimals.push(parseInt(dm[1], 10));
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- defaults to empty decimals list
+  }
 
   const nextDecimal = existingDecimals.length === 0 ? 1 : Math.max(...existingDecimals) + 1;
   const decimalPhase = `${normalizedBase}.${nextDecimal}`;
@@ -2784,9 +2824,8 @@ function cmdPhaseInsert(cwd, afterPhase, description, raw) {
 // ─── Phase Remove ─────────────────────────────────────────────────────────────
 
 function cmdPhaseRemove(cwd, targetPhase, options, raw) {
-  if (!targetPhase) {
-    error('phase number required for phase remove', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(targetPhase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const phasesDir = path.join(cwd, '.planning', 'phases');
@@ -2806,7 +2845,8 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
     const entries = fs.readdirSync(phasesDir, { withFileTypes: true });
     const dirs = entries.filter(e => e.isDirectory()).map(e => e.name).sort();
     targetDir = dirs.find(d => d.startsWith(normalized + '-') || d === normalized);
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- targetDir stays null
+  }
 
   // Check for executed work (SUMMARY.md files)
   if (targetDir && !force) {
@@ -2874,7 +2914,10 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      // Was: empty catch (silent failure)
+      error(`Failed to renumber decimal phases after removal: ${e.message}`, EXIT_FILESYSTEM);
+    }
 
   } else {
     // Integer removal: renumber all subsequent integer phases
@@ -2932,7 +2975,10 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      // Was: empty catch (silent failure)
+      error(`Failed to renumber integer phases after removal: ${e.message}`, EXIT_FILESYSTEM);
+    }
   }
 
   // Update ROADMAP.md
@@ -3037,9 +3083,8 @@ function cmdPhaseRemove(cwd, targetPhase, options, raw) {
 // ─── Phase Complete (Transition) ──────────────────────────────────────────────
 
 function cmdPhaseComplete(cwd, phaseNum, raw) {
-  if (!phaseNum) {
-    error('phase number required for phase complete', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phaseNum);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const roadmapPath = path.join(cwd, '.planning', 'ROADMAP.md');
   const statePath = path.join(cwd, '.planning', 'STATE.md');
@@ -3060,15 +3105,15 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
   if (fs.existsSync(roadmapPath)) {
     let roadmapContent = fs.readFileSync(roadmapPath, 'utf-8');
 
+    const phaseEscaped = escapeRegExp(phaseNum);
     // Checkbox: - [ ] Phase N: → - [x] Phase N: (...completed DATE)
     const checkboxPattern = new RegExp(
-      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${escapeRegExp(phaseNum)}[:\\s][^\\n]*)`,
+      `(-\\s*\\[)[ ](\\]\\s*.*Phase\\s+${phaseEscaped}[:\\s][^\\n]*)`,
       'i'
     );
     roadmapContent = roadmapContent.replace(checkboxPattern, `$1x$2 (completed ${today})`);
 
     // Progress table: update Status to Complete, add date
-    const phaseEscaped = escapeRegExp(phaseNum);
     const tablePattern = new RegExp(
       `(\\|\\s*${phaseEscaped}\\.?\\s[^|]*\\|[^|]*\\|)\\s*[^|]*(\\|)\\s*[^|]*(\\|)`,
       'i'
@@ -3114,7 +3159,8 @@ function cmdPhaseComplete(cwd, phaseNum, raw) {
         }
       }
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- defaults for phase complete still work
+  }
 
   // Update STATE.md
   if (fs.existsSync(statePath)) {
@@ -3223,10 +3269,12 @@ function cmdMilestoneComplete(cwd, version, options, raw) {
           // Count tasks
           const taskMatches = content.match(/##\s*Task\s*\d+/gi) || [];
           totalTasks += taskMatches.length;
-        } catch {}
+        } catch (e) { // Intentional: skip unreadable summary file -- continues to next summary
+        }
       }
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- milestone still archives other files
+  }
 
   // Archive ROADMAP.md
   if (fs.existsSync(roadmapPath)) {
@@ -3330,7 +3378,8 @@ function cmdValidateConsistency(cwd, raw) {
       const dm = dir.match(/^(\d+(?:\.\d+)?)/);
       if (dm) diskPhases.add(dm[1]);
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- diskPhases stays empty
+  }
 
   // Check: phases in ROADMAP but not on disk
   for (const p of roadmapPhases) {
@@ -3672,9 +3721,8 @@ function getMilestoneInfo(cwd) {
 }
 
 function cmdInitExecutePhase(cwd, phase, includes, raw) {
-  if (!phase) {
-    error('phase required for init execute-phase', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
@@ -3744,9 +3792,8 @@ function cmdInitExecutePhase(cwd, phase, includes, raw) {
 }
 
 function cmdInitPlanPhase(cwd, phase, includes, raw) {
-  if (!phase) {
-    error('phase required for init plan-phase', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
@@ -3997,9 +4044,8 @@ function cmdInitResume(cwd, raw) {
 }
 
 function cmdInitVerifyWork(cwd, phase, raw) {
-  if (!phase) {
-    error('phase required for init verify-work', EXIT_USAGE);
-  }
+  const phaseErr = validatePhaseNumber(phase);
+  if (phaseErr) { error(phaseErr, EXIT_USAGE); }
 
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
@@ -4026,6 +4072,10 @@ function cmdInitVerifyWork(cwd, phase, raw) {
 }
 
 function cmdInitPhaseOp(cwd, phase, raw) {
+  if (phase) {
+    const phaseErr = validatePhaseNumber(phase);
+    if (phaseErr) { error(phaseErr, EXIT_USAGE); }
+  }
   const config = loadConfig(cwd);
   const phaseInfo = findPhaseInternal(cwd, phase);
 
@@ -4435,13 +4485,17 @@ async function main() {
         const typeIdx = args.indexOf('--type');
         const waveIdx = args.indexOf('--wave');
         const fieldsIdx = args.indexOf('--fields');
+        if (fieldsIdx !== -1) {
+          const jsonErr = validateJsonString(args[fieldsIdx + 1], '--fields');
+          if (jsonErr) { error(jsonErr, EXIT_USAGE); }
+        }
         cmdTemplateFill(cwd, templateType, {
           phase: phaseIdx !== -1 ? args[phaseIdx + 1] : null,
           plan: planIdx !== -1 ? args[planIdx + 1] : null,
           name: nameIdx !== -1 ? args[nameIdx + 1] : null,
           type: typeIdx !== -1 ? args[typeIdx + 1] : 'execute',
           wave: waveIdx !== -1 ? args[waveIdx + 1] : '1',
-          fields: fieldsIdx !== -1 ? JSON.parse(args[fieldsIdx + 1]) : {},
+          fields: fieldsIdx !== -1 ? sanitizeJson(JSON.parse(args[fieldsIdx + 1])) : {},
         }, raw);
       } else {
         error('Unknown template subcommand. Available: select, fill', EXIT_USAGE);

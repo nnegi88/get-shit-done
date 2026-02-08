@@ -6,6 +6,18 @@ const os = require('os');
 const readline = require('readline');
 const crypto = require('crypto');
 
+// Security Utilities
+function sanitizeJson(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeJson);
+  const clean = {};
+  for (const key of Object.keys(obj)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    clean[key] = sanitizeJson(obj[key]);
+  }
+  return clean;
+}
+
 // Colors
 const cyan = '\x1b[36m';
 const green = '\x1b[32m';
@@ -182,7 +194,7 @@ function buildHookCommand(configDir, hookName) {
 function readSettings(settingsPath) {
   if (fs.existsSync(settingsPath)) {
     try {
-      return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      return sanitizeJson(JSON.parse(fs.readFileSync(settingsPath, 'utf8')));
     } catch (e) {
       return {};
     }
@@ -922,7 +934,7 @@ function uninstall(isGlobal, runtime = 'claude') {
     const configPath = path.join(opencodeConfigDir, 'opencode.json');
     if (fs.existsSync(configPath)) {
       try {
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const config = sanitizeJson(JSON.parse(fs.readFileSync(configPath, 'utf8')));
         let modified = false;
 
         // Remove GSD permission entries
@@ -1026,7 +1038,7 @@ function parseJsonc(content) {
   // Remove trailing commas before } or ]
   result = result.replace(/,(\s*[}\]])/g, '$1');
 
-  return JSON.parse(result);
+  return sanitizeJson(JSON.parse(result));
 }
 
 /**
@@ -1210,7 +1222,7 @@ function saveLocalPatches(configDir) {
   if (!fs.existsSync(manifestPath)) return [];
 
   let manifest;
-  try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch { return []; }
+  try { manifest = sanitizeJson(JSON.parse(fs.readFileSync(manifestPath, 'utf8'))); } catch { return []; }
 
   const patchesDir = path.join(configDir, PATCHES_DIR_NAME);
   const modified = [];
@@ -1251,7 +1263,7 @@ function reportLocalPatches(configDir) {
   if (!fs.existsSync(metaPath)) return [];
 
   let meta;
-  try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch { return []; }
+  try { meta = sanitizeJson(JSON.parse(fs.readFileSync(metaPath, 'utf8'))); } catch { return []; }
 
   if (meta.files && meta.files.length > 0) {
     console.log('');
