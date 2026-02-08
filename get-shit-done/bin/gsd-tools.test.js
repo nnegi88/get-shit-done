@@ -2426,3 +2426,564 @@ describe('config-set command', () => {
     assert.strictEqual(config.model_profile, 'budget', 'value should be set in new config');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state load command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state load command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns config and state when both exist', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      JSON.stringify({ model_profile: 'quality', commit_docs: true })
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 02\n**Status:** In progress'
+    );
+
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.config_exists, true, 'config should exist');
+    assert.strictEqual(output.state_exists, true, 'state should exist');
+    assert.ok(output.config.model_profile, 'config should have model_profile');
+    assert.ok(output.state_raw.includes('Current Phase'), 'state_raw should contain STATE.md content');
+  });
+
+  test('returns defaults when config missing', () => {
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.config_exists, false, 'config should not exist');
+    assert.strictEqual(output.config.model_profile, 'balanced', 'should fall back to balanced profile');
+  });
+
+  test('returns state fields parsed from STATE.md content', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 03\n**Status:** Ready to execute'
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap v1.0'
+    );
+
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.state_exists, true, 'state should exist');
+    assert.strictEqual(output.roadmap_exists, true, 'roadmap should exist');
+    assert.ok(output.state_raw.includes('Status'), 'state_raw should have Status field');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state update command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state update command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates valid field in STATE.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Status:** In progress\n**Current Phase:** 01\n'
+    );
+
+    const result = runGsdTools('state update Status "Phase complete"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should update successfully');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Status:** Phase complete'), 'file should have updated value');
+  });
+
+  test('handles missing STATE.md gracefully', () => {
+    const result = runGsdTools('state update Status "In progress"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, false, 'should not update when STATE.md missing');
+    assert.ok(output.reason.includes('STATE.md not found'), 'reason should mention missing file');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state get command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state get command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('returns full state JSON', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 02\n**Status:** In progress\n'
+    );
+
+    const result = runGsdTools('state get', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.content, 'should return content field');
+    assert.ok(output.content.includes('Current Phase'), 'content should have full STATE.md');
+  });
+
+  test('returns specific field when argument provided', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# Project State\n\n**Current Phase:** 02\n**Status:** In progress\n'
+    );
+
+    const result = runGsdTools('state get Status', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.Status, 'In progress', 'should return specific field value');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state patch command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state patch command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('applies single patch to STATE.md', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Status:** Ready to plan\n**Current Phase:** 01\n'
+    );
+
+    const result = runGsdTools('state patch --Status "In progress"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.deepStrictEqual(output.updated, ['Status'], 'Status should be updated');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Status:** In progress'), 'file should be patched');
+  });
+
+  test('applies multiple patches in sequence', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Status:** Ready\n**Current Phase:** 01\n**Current Plan:** 0\n'
+    );
+
+    const result = runGsdTools('state patch --Status "In progress" --"Current Plan" 1', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.updated.includes('Status'), 'Status should be updated');
+    assert.ok(output.updated.includes('Current Plan'), 'Current Plan should be updated');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state advance-plan command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state advance-plan command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('advances plan number in state', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Plan:** 1\n**Total Plans in Phase:** 3\n**Status:** In progress\n**Last Activity:** 2025-01-01\n'
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, true, 'should advance');
+    assert.strictEqual(output.previous_plan, 1, 'previous plan should be 1');
+    assert.strictEqual(output.current_plan, 2, 'current plan should be 2');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('**Current Plan:** 2'), 'file should show plan 2');
+  });
+
+  test('detects last plan and sets verification status', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Current Plan:** 3\n**Total Plans in Phase:** 3\n**Status:** In progress\n**Last Activity:** 2025-01-01\n'
+    );
+
+    const result = runGsdTools('state advance-plan', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.advanced, false, 'should not advance past total');
+    assert.strictEqual(output.reason, 'last_plan', 'reason should be last_plan');
+    assert.strictEqual(output.status, 'ready_for_verification', 'status should be ready_for_verification');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state record-metric command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state record-metric command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('records metric with full options', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+
+`
+    );
+
+    const result = runGsdTools('state record-metric --phase 01 --plan 01 --duration 5m --tasks 3 --files 7', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'metric should be recorded');
+    assert.strictEqual(output.phase, '01', 'phase should match');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Phase 01 P01'), 'STATE.md should contain metric row');
+    assert.ok(content.includes('5m'), 'should contain duration');
+  });
+
+  test('records metric with minimal options', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      `# State
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+
+`
+    );
+
+    const result = runGsdTools('state record-metric --phase 02 --plan 01 --duration 3m', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'metric should be recorded');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Phase 02 P01'), 'metric row should exist');
+    assert.ok(content.includes('- tasks'), 'missing tasks should show dash');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state update-progress command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state update-progress command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('updates progress bar when phases exist', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Progress:** [old] 0%\n'
+    );
+
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '01-test');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    fs.writeFileSync(path.join(phaseDir, '01-01-PLAN.md'), '# Plan');
+    fs.writeFileSync(path.join(phaseDir, '01-01-SUMMARY.md'), '# Summary');
+    fs.writeFileSync(path.join(phaseDir, '01-02-PLAN.md'), '# Plan 2');
+
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'progress should be updated');
+    assert.strictEqual(output.percent, 50, 'should be 50% (1/2 plans done)');
+    assert.strictEqual(output.completed, 1, '1 completed');
+    assert.strictEqual(output.total, 2, '2 total');
+  });
+
+  test('handles empty phases directory', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n**Progress:** [old] 0%\n'
+    );
+
+    const result = runGsdTools('state update-progress', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.updated, true, 'should still update');
+    assert.strictEqual(output.percent, 0, 'should be 0%');
+    assert.strictEqual(output.total, 0, 'total should be 0');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state add-decision command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state add-decision command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('adds decision with phase context', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Decisions\n\nNone yet.\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state add-decision --phase 01 --summary "Use Prisma ORM"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'decision should be added');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('[Phase 01]: Use Prisma ORM'), 'decision with phase context should appear');
+    assert.ok(!content.includes('None yet'), 'placeholder should be removed');
+  });
+
+  test('adds decision without phase context', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Decisions\n\nNone yet.\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state add-decision --summary "Prefer simplicity"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'decision should be added');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('[Phase ?]: Prefer simplicity'), 'decision with ? phase should appear');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state add-blocker command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state add-blocker command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('adds new blocker to state', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Blockers/Concerns\n\nNone\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state add-blocker --text "Waiting for API credentials"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'blocker should be added');
+    assert.strictEqual(output.blocker, 'Waiting for API credentials', 'blocker text correct');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('- Waiting for API credentials'), 'blocker should appear');
+    assert.ok(!content.match(/^None$/m), 'placeholder should be removed');
+  });
+
+  test('adds blocker alongside existing blockers', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Blockers/Concerns\n\n- Existing issue\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state add-blocker --text "New issue found"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.added, true, 'blocker should be added');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('- Existing issue'), 'existing blocker preserved');
+    assert.ok(content.includes('- New issue found'), 'new blocker added');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state resolve-blocker command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state resolve-blocker command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('resolves existing blocker', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Blockers/Concerns\n\n- Waiting for API credentials\n- Design review needed\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state resolve-blocker --text "API credentials"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'blocker should be resolved');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(!content.includes('API credentials'), 'resolved blocker should be removed');
+    assert.ok(content.includes('Design review needed'), 'other blocker preserved');
+  });
+
+  test('handles non-existent blocker gracefully', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n### Blockers/Concerns\n\n- Real blocker\n\n## Session\n'
+    );
+
+    const result = runGsdTools('state resolve-blocker --text "nonexistent issue"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.resolved, true, 'command should succeed even if no match found');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Real blocker'), 'existing blocker should remain');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// state record-session command
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('state record-session command', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('records session with full options', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n## Session Continuity\n\n**Last session:** 2025-01-01\n**Stopped At:** Phase 1, Plan 1\n**Resume File:** None\n'
+    );
+
+    const result = runGsdTools('state record-session --stopped-at "Phase 2, Plan 1" --resume-file .planning/phases/02-api/02-01-PLAN.md', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'session should be recorded');
+    assert.ok(output.updated.includes('Last session'), 'Last session should be updated');
+    assert.ok(output.updated.includes('Stopped At'), 'Stopped At should be updated');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Phase 2, Plan 1'), 'stopped at should be updated');
+    assert.ok(content.includes('02-01-PLAN.md'), 'resume file should be updated');
+  });
+
+  test('records session with minimal options', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\n## Session Continuity\n\n**Last session:** 2025-01-01\n**Stopped At:** Phase 1\n**Resume File:** None\n'
+    );
+
+    const result = runGsdTools('state record-session --stopped-at "Completed 01-02"', tmpDir);
+    assert.ok(result.success, `Command failed: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.recorded, true, 'session should be recorded');
+
+    const content = fs.readFileSync(path.join(tmpDir, '.planning', 'STATE.md'), 'utf-8');
+    assert.ok(content.includes('Completed 01-02'), 'stopped at should be updated');
+  });
+});
