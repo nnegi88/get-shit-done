@@ -12,7 +12,7 @@ This roadmap delivers a systematic hardening pass across the GSD CLI codebase, o
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Test Safety Net** - Capture current behavior across all commands and runtimes before any code changes
+- [x] **Phase 1: Test Safety Net** - Capture current behavior across all commands and runtimes before any code changes
 - [ ] **Phase 2: Error Handling & Security** - Make failures visible and inputs validated with structured errors and security hardening
 - [ ] **Phase 3: Monolith Decomposition** - Break gsd-tools.js and install.js into focused modules with lazy-loading registry
 - [ ] **Phase 4: Data Integrity** - Protect state files with atomic writes, signal handling, file locking, and backups
@@ -34,10 +34,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- install.js module.exports guard + pure function unit tests (JSONC, frontmatter, tool mappers)
-- [ ] 01-02-PLAN.md -- gsd-tools.js Tier 1 standalone commands + Tier 2 state subcommands characterization tests
-- [ ] 01-03-PLAN.md -- gsd-tools.js Tier 3-4 commands (frontmatter/template/verify/init) + error recovery + phase numbering edge cases
-- [ ] 01-04-PLAN.md -- install.js runtime integration tests (3 runtimes) + hook tests + npm test script updates
+- [x] 01-01-PLAN.md -- install.js module.exports guard + pure function unit tests (JSONC, frontmatter, tool mappers)
+- [x] 01-02-PLAN.md -- gsd-tools.js Tier 1 standalone commands + Tier 2 state subcommands characterization tests
+- [x] 01-03-PLAN.md -- gsd-tools.js Tier 3-4 commands (frontmatter/template/verify/init) + error recovery + phase numbering edge cases
+- [x] 01-04-PLAN.md -- install.js runtime integration tests (3 runtimes) + hook tests + npm test script updates
 
 ### Phase 2: Error Handling & Security
 **Goal**: Users get clear error messages on bad input, failures are visible instead of silent, and all inputs are validated against security threats
@@ -121,7 +121,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Safety Net | 0/4 | Planned | - |
+| 1. Test Safety Net | 4/4 | ✓ Complete | 2026-02-08 |
 | 2. Error Handling & Security | 0/0 | Not started | - |
 | 3. Monolith Decomposition | 0/0 | Not started | - |
 | 4. Data Integrity | 0/0 | Not started | - |
@@ -130,4 +130,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-08 (Phase 1 planned)*
+*Last updated: 2026-02-08 (Phase 1 complete)*
