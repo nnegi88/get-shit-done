@@ -44,3 +44,90 @@ describe('module import guard', () => {
     assert.strictEqual(typeof buildHookCommand, 'function', 'buildHookCommand should be a function');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// parseJsonc - JSONC parser edge case tests (TEST-03)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('parseJsonc', () => {
+  test('parses plain JSON without comments', () => {
+    const result = parseJsonc('{ "key": "value", "num": 42 }');
+    assert.deepStrictEqual(result, { key: 'value', num: 42 });
+  });
+
+  test('strips single-line comments', () => {
+    const input = '{ "key": "val" // this is a comment\n}';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { key: 'val' });
+  });
+
+  test('strips block comments', () => {
+    const input = '{ /* comment */ "key": "val" }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { key: 'val' });
+  });
+
+  test('handles nested block comments (stops at first */)', () => {
+    // JSONC block comments do not nest. The parser stops at the first */
+    // Input: { "a": /* outer /* not nested */ "val" }
+    // The comment starts at /* outer and ends at the first */
+    const input = '{ "a": /* outer /* not nested */ "val" }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { a: 'val' });
+  });
+
+  test('preserves // inside strings (URL-like values)', () => {
+    const input = '{ "url": "https://example.com" }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { url: 'https://example.com' });
+  });
+
+  test('handles escaped quotes inside strings', () => {
+    const input = '{ "key": "value with \\"quotes\\"" }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { key: 'value with "quotes"' });
+  });
+
+  test('strips UTF-8 BOM prefix and parses', () => {
+    const input = '\uFEFF{"key": "val"}';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { key: 'val' });
+  });
+
+  test('removes trailing comma before closing brace', () => {
+    const input = '{ "a": 1, "b": 2, }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { a: 1, b: 2 });
+  });
+
+  test('removes trailing comma before closing bracket', () => {
+    const input = '{ "arr": [1, 2, 3, ] }';
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { arr: [1, 2, 3] });
+  });
+
+  test('throws SyntaxError for malformed JSON after stripping', () => {
+    assert.throws(
+      () => parseJsonc('{ broken }'),
+      SyntaxError,
+      'should throw SyntaxError for malformed input'
+    );
+  });
+
+  test('handles empty object string', () => {
+    const result = parseJsonc('{}');
+    assert.deepStrictEqual(result, {});
+  });
+
+  test('handles multi-line comments spanning lines', () => {
+    const input = `{
+  "a": 1,
+  /* this comment
+     spans multiple
+     lines */
+  "b": 2
+}`;
+    const result = parseJsonc(input);
+    assert.deepStrictEqual(result, { a: 1, b: 2 });
+  });
+});
