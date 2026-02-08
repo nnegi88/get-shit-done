@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 01.1 of 6 (Migrate GSD from Subagents to Agent Teams)
-Plan: 1 of 5 in current phase
+Plan: 4 of 5 in current phase
 Status: In progress
-Last activity: 2026-02-09 -- Completed 01.1-01-PLAN.md (add team communication protocol to agents)
+Last activity: 2026-02-09 -- Completed 01.1-04-PLAN.md (new-project workflow team migration)
 
-Progress: [██████░░░░] 36%
+Progress: [████████░░] 64%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 6 min
-- Total execution time: 0.48 hours
+- Total plans completed: 8
+- Average duration: 5 min
+- Total execution time: 0.68 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 4 | 24 min | 6 min |
-| 01.1 | 1 | 5 min | 5 min |
+| 01.1 | 4 | 17 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (4 min), 01-03 (7 min), 01-04 (9 min), 01.1-01 (5 min)
-- Trend: Steady
+- Last 5 plans: 01-04 (9 min), 01.1-01 (5 min), 01.1-02 (5 min), 01.1-03 (4 min), 01.1-04 (3 min)
+- Trend: Accelerating
 
 *Updated after each plan completion*
 
@@ -59,6 +59,10 @@ Recent decisions affecting current work:
 - [01.1-01]: Append-only approach for agent updates -- existing content untouched, protocol added after last section
 - [01.1-01]: In-process teammate mode over tmux for no external dependency
 - [01.1-01]: Standalone agents get base protocol with note rather than being skipped
+- [01.1-04]: Preserved original Step 6 verbatim as fallback -- zero behavioral change when teams unavailable
+- [01.1-04]: Direct SendMessage over broadcast for researcher cross-pollination -- targeted by domain
+- [01.1-04]: Synthesizer as teammate with addBlockedBy rather than sequential spawn-after-complete
+- [01.1-04]: Roadmapper stays standalone subagent -- single-agent workflow, no team benefit
 
 ### Roadmap Evolution
 
@@ -76,5 +80,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 01.1-01-PLAN.md (add team communication protocol to agents)
-Resume file: .planning/phases/01.1-migrate-gsd-from-subagents-to-agent-teams/01.1-02-PLAN.md
+Stopped at: Completed 01.1-04-PLAN.md (new-project workflow team migration)
+Resume file: .planning/phases/01.1-migrate-gsd-from-subagents-to-agent-teams/01.1-05-PLAN.md
