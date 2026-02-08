@@ -4378,3 +4378,424 @@ describe('phase next-decimal edge cases (TEST-06)', () => {
     assert.strictEqual(output.next, '99.1', 'should still suggest 99.1');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Error recovery tests (TEST-05)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('error recovery: state commands with corrupt/missing state', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('state load with corrupt config.json does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'config.json'),
+      'THIS IS NOT VALID JSON {{{}}}'
+    );
+
+    const result = runGsdTools('state', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should fall back to defaults
+    assert.ok(output.config, 'should still have config (defaults)');
+  });
+
+  test('state get with missing STATE.md returns meaningful error', () => {
+    const result = runGsdTools('state get', tmpDir);
+    // Command exits non-zero for missing STATE.md -- this is valid error recovery
+    assert.ok(!result.success, 'should fail when STATE.md missing');
+    assert.ok(result.error.includes('STATE.md'), 'error should mention STATE.md');
+  });
+
+  test('state patch with missing STATE.md does not crash', () => {
+    const result = runGsdTools('state patch --Status "In progress"', tmpDir);
+    // May fail or succeed gracefully
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+      assert.ok(!result.error.includes('Cannot read properties of null'), 'should not have unhandled null dereference');
+    }
+  });
+
+  test('state advance-plan with missing STATE.md does not crash', () => {
+    const result = runGsdTools('state advance-plan', tmpDir);
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+
+  test('state record-metric with missing metrics table does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\nNo metrics table here.\n'
+    );
+
+    const result = runGsdTools('state record-metric --phase 01 --plan 01 --duration 5m', tmpDir);
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+
+  test('state add-decision with missing decisions section does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\nNo decisions section.\n'
+    );
+
+    const result = runGsdTools('state add-decision --phase 01 --summary "Test decision"', tmpDir);
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+
+  test('state add-blocker with missing blockers section does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\nNo blockers section.\n'
+    );
+
+    const result = runGsdTools('state add-blocker --text "Test blocker"', tmpDir);
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+
+  test('state record-session with missing session section does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'STATE.md'),
+      '# State\n\nNo session section.\n'
+    );
+
+    const result = runGsdTools('state record-session --stopped-at "Phase 1"', tmpDir);
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output, 'should return valid JSON');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+});
+
+describe('error recovery: roadmap and phase commands with bad input', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('roadmap get-phase with empty ROADMAP.md returns not found', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      ''
+    );
+
+    const result = runGsdTools('roadmap get-phase 1', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.found, false, 'should return not found');
+  });
+
+  test('phase-plan-index with corrupt PLAN.md files does not crash', () => {
+    const phaseDir = path.join(tmpDir, '.planning', 'phases', '03-api');
+    fs.mkdirSync(phaseDir, { recursive: true });
+    // Malformed frontmatter
+    fs.writeFileSync(path.join(phaseDir, '03-01-PLAN.md'), '---\nbroken: [unclosed\n---\n# Plan');
+
+    const result = runGsdTools('phase-plan-index 03', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.plans, 'should have plans array');
+  });
+
+  test('validate consistency with partially corrupt state does not crash', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, '.planning', 'ROADMAP.md'),
+      '# Roadmap\n\nCorrupt content: no phases here\n'
+    );
+
+    const result = runGsdTools('validate consistency', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('passed' in output || 'error' in output, 'should return result');
+  });
+
+  test('progress command with no roadmap does not crash', () => {
+    const result = runGsdTools('progress json', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok('total_plans' in output || 'error' in output, 'should return progress or error');
+  });
+});
+
+describe('error recovery: frontmatter with binary/non-text file', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('frontmatter get on file with no frontmatter returns empty', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'no-frontmatter.md'),
+      '# Just a heading\n\nNo frontmatter at all.\n'
+    );
+
+    const result = runGsdTools('frontmatter get no-frontmatter.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    // Should return empty object since no frontmatter
+    assert.ok(typeof output === 'object', 'should return an object');
+  });
+
+  test('frontmatter validate with non-existent file returns error', () => {
+    const result = runGsdTools('frontmatter validate nonexistent.md --schema plan', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+
+  test('frontmatter set with missing required args fails cleanly', () => {
+    const result = runGsdTools('frontmatter set', tmpDir);
+    assert.ok(!result.success, 'should fail with missing args');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('frontmatter merge with invalid JSON fails cleanly', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test.md'),
+      '---\nphase: 01\n---\n# Content\n'
+    );
+
+    const result = runGsdTools('frontmatter merge test.md --data not-json', tmpDir);
+    assert.ok(!result.success, 'should fail with invalid JSON');
+    assert.ok(result.error, 'should have error message');
+  });
+});
+
+describe('error recovery: template and verify commands', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('template select with missing file falls back to standard', () => {
+    const result = runGsdTools('template select nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.type, 'standard', 'should fall back to standard template');
+    assert.ok(output.error, 'should include error message');
+  });
+
+  test('template fill with missing phase returns error', () => {
+    const result = runGsdTools('template fill summary --phase 99 --plan 01', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, 'should return error');
+    assert.ok(output.error.includes('not found') || output.error.includes('Phase not found'), 'error mentions not found');
+  });
+
+  test('verify plan-structure with non-existent file returns error', () => {
+    const result = runGsdTools('verify plan-structure nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+
+  test('verify phase-completeness with non-existent phase returns error', () => {
+    const result = runGsdTools('verify phase-completeness 99', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, 'should have error');
+  });
+
+  test('verify artifacts with no must_haves returns error', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify artifacts test-plan.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, 'should return error about missing artifacts');
+  });
+
+  test('verify key-links with no must_haves returns error', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'test-plan.md'),
+      '---\nphase: 01\nplan: 01\n---\n\n# Plan\n'
+    );
+
+    const result = runGsdTools('verify key-links test-plan.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.ok(output.error, 'should return error about missing key_links');
+  });
+});
+
+describe('error recovery: commit and summary commands', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('commit with no git repo returns error', () => {
+    const result = runGsdTools('commit "test message" --files test.txt', tmpDir);
+    // Should fail since tmpDir has no git repo
+    if (result.success) {
+      const output = JSON.parse(result.output);
+      assert.ok(output.committed === false || output.error, 'should indicate failure');
+    } else {
+      assert.ok(result.error, 'should have error message');
+    }
+  });
+
+  test('verify-summary with missing summary returns error', () => {
+    const result = runGsdTools('verify-summary .planning/nonexistent-SUMMARY.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.passed, false, 'should not pass');
+    assert.ok(output.errors.includes('SUMMARY.md not found'), 'should report missing summary');
+  });
+
+  test('summary-extract with missing summary returns error', () => {
+    const result = runGsdTools('summary-extract .planning/phases/01-test/nonexistent.md', tmpDir);
+    assert.ok(result.success, `Command should not crash: ${result.error}`);
+
+    const output = JSON.parse(result.output);
+    assert.strictEqual(output.error, 'File not found', 'should report file not found');
+  });
+});
+
+describe('error recovery: unknown and missing arguments', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('unknown command returns error', () => {
+    const result = runGsdTools('nonexistent-command', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown command');
+    assert.ok(result.error.includes('Unknown command'), 'error should mention unknown command');
+  });
+
+  test('commit with no message fails cleanly', () => {
+    const result = runGsdTools('commit', tmpDir);
+    assert.ok(!result.success, 'should fail without message');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('generate-slug without text fails cleanly', () => {
+    const result = runGsdTools('generate-slug', tmpDir);
+    assert.ok(!result.success, 'should fail without text');
+    assert.ok(result.error.includes('text required'), 'error mentions text required');
+  });
+
+  test('init with unknown workflow fails cleanly', () => {
+    const result = runGsdTools('init nonexistent-workflow', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown workflow');
+    assert.ok(result.error.includes('Unknown init workflow'), 'error mentions unknown workflow');
+  });
+
+  test('frontmatter with unknown subcommand fails cleanly', () => {
+    const result = runGsdTools('frontmatter unknown-sub', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown subcommand');
+    assert.ok(result.error.includes('Unknown frontmatter subcommand'), 'error mentions unknown subcommand');
+  });
+
+  test('verify with unknown subcommand fails cleanly', () => {
+    const result = runGsdTools('verify unknown-sub', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown subcommand');
+    assert.ok(result.error.includes('Unknown verify subcommand'), 'error mentions unknown subcommand');
+  });
+
+  test('template with unknown subcommand fails cleanly', () => {
+    const result = runGsdTools('template unknown-sub', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown subcommand');
+    assert.ok(result.error.includes('Unknown template subcommand'), 'error mentions unknown subcommand');
+  });
+
+  test('init execute-phase without phase arg fails cleanly', () => {
+    const result = runGsdTools('init execute-phase', tmpDir);
+    assert.ok(!result.success, 'should fail without phase arg');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('init verify-work without phase arg fails cleanly', () => {
+    const result = runGsdTools('init verify-work', tmpDir);
+    assert.ok(!result.success, 'should fail without phase arg');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('verify commits with no hashes fails cleanly', () => {
+    const result = runGsdTools('verify commits', tmpDir);
+    assert.ok(!result.success, 'should fail without hashes');
+    assert.ok(result.error, 'should have error message');
+  });
+
+  test('frontmatter validate with unknown schema fails cleanly', () => {
+    fs.writeFileSync(path.join(tmpDir, 'test.md'), '---\nphase: 01\n---\n');
+
+    const result = runGsdTools('frontmatter validate test.md --schema unknown', tmpDir);
+    assert.ok(!result.success, 'should fail for unknown schema');
+    assert.ok(result.error.includes('Unknown schema'), 'error mentions unknown schema');
+  });
+});
