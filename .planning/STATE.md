@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 1 of 6 (Test Safety Net)
-Plan: 2 of 4 in current phase
-Status: In progress
-Last activity: 2026-02-08 -- Completed 01-02-PLAN.md (standalone and state command tests)
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-02-08 -- Completed 01-04-PLAN.md (install runtime integration and hook tests)
 
-Progress: [██░░░░░░░░] 17%
+Progress: [██████░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 4 min
-- Total execution time: 0.13 hours
+- Total plans completed: 4
+- Average duration: 6 min
+- Total execution time: 0.40 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01 | 2 | 8 min | 4 min |
+| 01 | 4 | 24 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4 min), 01-02 (4 min)
+- Last 5 plans: 01-01 (4 min), 01-02 (4 min), 01-03 (7 min), 01-04 (9 min)
 - Trend: Steady
 
 *Updated after each plan completion*
@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - [01-01]: 59 tests exceeding 45+ target for thorough characterization coverage
 - [01-02]: Followed existing test pattern exactly -- no new abstractions introduced
 - [01-02]: Used area filter for list-todos tests matching actual implementation
+- [01-04]: Used --config-dir flag for install isolation instead of mocking home directory
+- [01-04]: Tested hooks via subprocess stdin/stdout rather than requiring internal modules
+- [01-04]: Kept integration tests in same file as unit tests for cohesion
 
 ### Pending Todos
 
@@ -62,5 +65,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 01-02-PLAN.md (standalone and state command tests)
-Resume file: .planning/phases/01-test-safety-net/01-03-PLAN.md
+Stopped at: Completed 01-04-PLAN.md (install runtime integration and hook tests) -- Phase 01 complete
+Resume file: .planning/phases/02-error-handling/
