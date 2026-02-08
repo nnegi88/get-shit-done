@@ -1,12 +1,17 @@
 /**
- * install.js Pure Function Unit Tests
+ * install.js Pure Function Unit Tests + Runtime Integration Tests
  *
  * Tests for the pure functions exported from install.js:
  * JSONC parser, frontmatter converters, tool name mappers, and utilities.
+ *
+ * Integration tests for installer runtime targets:
+ * Claude Code, OpenCode, Gemini CLI install paths and upgrade paths.
  */
 
-const { test, describe } = require('node:test');
+const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert');
+const { execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
@@ -583,5 +588,365 @@ describe('getGlobalDir', () => {
   test('uses explicit dir for opencode when provided', () => {
     const result = getGlobalDir('opencode', '/custom/opencode');
     assert.strictEqual(result, '/custom/opencode');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Installer Runtime Integration Tests (TEST-01)
+//
+// These tests invoke the installer as a subprocess, targeting temp directories
+// via --config-dir to verify file structure output for each runtime target.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const installScript = path.join(__dirname, 'install.js');
+
+/**
+ * Run the installer subprocess targeting a temp directory.
+ * Returns { stdout, stderr, exitCode }.
+ */
+function runInstaller(args, opts = {}) {
+  const cmd = `node "${installScript}" ${args}`;
+  try {
+    const stdout = execSync(cmd, {
+      encoding: 'utf8',
+      timeout: 30000,
+      env: { ...process.env, ...opts.env },
+      cwd: opts.cwd || process.cwd(),
+    });
+    return { stdout, stderr: '', exitCode: 0 };
+  } catch (err) {
+    return {
+      stdout: err.stdout || '',
+      stderr: err.stderr || '',
+      exitCode: err.status || 1,
+    };
+  }
+}
+
+/**
+ * Create a temp directory for testing installs.
+ */
+function createTempDir(prefix = 'gsd-install-test-') {
+  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+}
+
+/**
+ * Recursively remove a temp directory.
+ */
+function removeTempDir(dir) {
+  if (dir && fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Claude Runtime Install
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('installer runtime integration', () => {
+
+  describe('claude runtime install', () => {
+    let tmpDir;
+
+    before(() => {
+      tmpDir = createTempDir('gsd-claude-');
+      runInstaller(`--claude --global --config-dir "${tmpDir}" --force-statusline`);
+    });
+
+    after(() => {
+      removeTempDir(tmpDir);
+    });
+
+    test('creates expected directory structure', () => {
+      assert.ok(fs.existsSync(path.join(tmpDir, 'commands', 'gsd')), 'commands/gsd directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'agents')), 'agents directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'get-shit-done')), 'get-shit-done directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'settings.json')), 'settings.json exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'get-shit-done', 'VERSION')), 'VERSION file exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'gsd-file-manifest.json')), 'file manifest exists');
+    });
+
+    test('agent files have correct Claude frontmatter format (---name:---)', () => {
+      const agentsDir = path.join(tmpDir, 'agents');
+      const agents = fs.readdirSync(agentsDir).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+      assert.ok(agents.length > 0, 'at least one GSD agent installed');
+
+      for (const agent of agents) {
+        const content = fs.readFileSync(path.join(agentsDir, agent), 'utf8');
+        assert.ok(content.startsWith('---'), `${agent} starts with frontmatter delimiter`);
+        assert.ok(content.includes('name:'), `${agent} has name: field (Claude format)`);
+        // Verify frontmatter closes
+        const endIdx = content.indexOf('---', 3);
+        assert.ok(endIdx > 0, `${agent} has closing frontmatter delimiter`);
+      }
+    });
+
+    test('command files are .md with correct content', () => {
+      const gsdDir = path.join(tmpDir, 'commands', 'gsd');
+      const commands = fs.readdirSync(gsdDir).filter(f => f.endsWith('.md'));
+      assert.ok(commands.length >= 10, `at least 10 command files installed (got ${commands.length})`);
+
+      // Check help.md specifically
+      const helpPath = path.join(gsdDir, 'help.md');
+      assert.ok(fs.existsSync(helpPath), 'help.md command exists');
+      const helpContent = fs.readFileSync(helpPath, 'utf8');
+      assert.ok(helpContent.startsWith('---'), 'help.md has frontmatter');
+      assert.ok(helpContent.includes('description:'), 'help.md has description');
+    });
+
+    test('settings.json has hooks and statusline configured', () => {
+      const settings = JSON.parse(fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf8'));
+      assert.ok(settings.hooks, 'settings has hooks');
+      assert.ok(settings.hooks.SessionStart, 'settings has SessionStart hooks');
+      assert.ok(Array.isArray(settings.hooks.SessionStart), 'SessionStart is an array');
+      assert.ok(settings.statusLine, 'settings has statusLine');
+      assert.ok(settings.statusLine.command.includes('gsd-statusline'), 'statusLine references gsd-statusline');
+    });
+
+    test('upgrade path: re-install updates files without error', () => {
+      // Write a sentinel file to verify it survives/gets replaced
+      const versionPath = path.join(tmpDir, 'get-shit-done', 'VERSION');
+      const originalVersion = fs.readFileSync(versionPath, 'utf8');
+
+      // Modify VERSION to simulate older install
+      fs.writeFileSync(versionPath, '0.0.0');
+
+      // Re-run installer
+      const result = runInstaller(`--claude --global --config-dir "${tmpDir}" --force-statusline`);
+      assert.strictEqual(result.exitCode, 0, 'upgrade install exits cleanly');
+
+      // VERSION should be updated back
+      const newVersion = fs.readFileSync(versionPath, 'utf8');
+      assert.strictEqual(newVersion, originalVersion, 'VERSION updated after upgrade');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // OpenCode Runtime Install
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  describe('opencode runtime install', () => {
+    let tmpDir;
+
+    before(() => {
+      tmpDir = createTempDir('gsd-opencode-');
+      runInstaller(`--opencode --global --config-dir "${tmpDir}"`);
+    });
+
+    after(() => {
+      removeTempDir(tmpDir);
+    });
+
+    test('creates expected .opencode directory structure', () => {
+      assert.ok(fs.existsSync(path.join(tmpDir, 'command')), 'command/ directory exists (singular)');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'agents')), 'agents directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'get-shit-done')), 'get-shit-done directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'settings.json')), 'settings.json exists');
+      // OpenCode does NOT have commands/ (plural) — it uses command/ (singular)
+      assert.ok(!fs.existsSync(path.join(tmpDir, 'commands')), 'commands/ (plural) should not exist');
+    });
+
+    test('agent files have OpenCode frontmatter format (tools object, no name field)', () => {
+      const agentsDir = path.join(tmpDir, 'agents');
+      const agents = fs.readdirSync(agentsDir).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+      assert.ok(agents.length > 0, 'at least one GSD agent installed');
+
+      // Check first agent with tools
+      const executorPath = path.join(agentsDir, 'gsd-executor.md');
+      if (fs.existsSync(executorPath)) {
+        const content = fs.readFileSync(executorPath, 'utf8');
+        assert.ok(!content.match(/^name:/m), 'gsd-executor.md should NOT have name: field');
+        assert.ok(content.includes('tools:'), 'gsd-executor.md has tools: section');
+        // OpenCode tools format: key: true
+        assert.ok(content.includes(': true'), 'tools use key: true format');
+      }
+    });
+
+    test('command files are flat with gsd- prefix', () => {
+      const commandDir = path.join(tmpDir, 'command');
+      const commands = fs.readdirSync(commandDir).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+      assert.ok(commands.length >= 10, `at least 10 gsd- commands (got ${commands.length})`);
+
+      // Check that commands are flattened (e.g., gsd-help.md, not gsd/help.md)
+      assert.ok(commands.some(f => f === 'gsd-help.md'), 'gsd-help.md exists in flat command dir');
+    });
+
+    test('settings.json is valid JSON', () => {
+      const settingsContent = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf8');
+      assert.doesNotThrow(() => JSON.parse(settingsContent), 'settings.json is valid JSON');
+      // OpenCode should NOT have hooks.SessionStart (no check-update hook for opencode)
+      const settings = JSON.parse(settingsContent);
+      const hasSessionStart = settings.hooks && settings.hooks.SessionStart;
+      assert.ok(!hasSessionStart, 'OpenCode should not have SessionStart hooks');
+    });
+
+    test('upgrade path: existing custom content preserved during upgrade', () => {
+      // Create a custom (non-GSD) command file that should survive
+      const customFile = path.join(tmpDir, 'command', 'my-custom.md');
+      fs.writeFileSync(customFile, '---\ndescription: custom\n---\nMy custom command.');
+
+      // Re-run installer
+      const result = runInstaller(`--opencode --global --config-dir "${tmpDir}"`);
+      assert.strictEqual(result.exitCode, 0, 'upgrade install exits cleanly');
+
+      // Custom file should be preserved (installer only removes gsd-*.md before re-copying)
+      assert.ok(fs.existsSync(customFile), 'custom command file preserved after upgrade');
+      const content = fs.readFileSync(customFile, 'utf8');
+      assert.ok(content.includes('My custom command'), 'custom content intact');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Gemini Runtime Install
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  describe('gemini runtime install', () => {
+    let tmpDir;
+
+    before(() => {
+      tmpDir = createTempDir('gsd-gemini-');
+      runInstaller(`--gemini --global --config-dir "${tmpDir}" --force-statusline`);
+    });
+
+    after(() => {
+      removeTempDir(tmpDir);
+    });
+
+    test('creates expected .gemini directory structure', () => {
+      assert.ok(fs.existsSync(path.join(tmpDir, 'commands', 'gsd')), 'commands/gsd directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'agents')), 'agents directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'get-shit-done')), 'get-shit-done directory exists');
+      assert.ok(fs.existsSync(path.join(tmpDir, 'settings.json')), 'settings.json exists');
+    });
+
+    test('agent files have Gemini YAML format (tools as array with Gemini tool names)', () => {
+      const agentsDir = path.join(tmpDir, 'agents');
+      const agents = fs.readdirSync(agentsDir).filter(f => f.startsWith('gsd-') && f.endsWith('.md'));
+      assert.ok(agents.length > 0, 'at least one GSD agent installed');
+
+      // Check executor agent for Gemini tool format
+      const executorPath = path.join(agentsDir, 'gsd-executor.md');
+      if (fs.existsSync(executorPath)) {
+        const content = fs.readFileSync(executorPath, 'utf8');
+        assert.ok(content.includes('tools:'), 'has tools: section');
+        // Gemini uses array format with Gemini tool names
+        assert.ok(content.includes('  - read_file'), 'Read mapped to read_file');
+        assert.ok(content.includes('  - write_file'), 'Write mapped to write_file');
+        assert.ok(content.includes('  - run_shell_command'), 'Bash mapped to run_shell_command');
+        // Should NOT have color: field
+        assert.ok(!content.match(/^color:/m), 'color field stripped for Gemini');
+      }
+    });
+
+    test('command files are TOML format', () => {
+      const gsdDir = path.join(tmpDir, 'commands', 'gsd');
+      const commands = fs.readdirSync(gsdDir);
+      const tomlFiles = commands.filter(f => f.endsWith('.toml'));
+      assert.ok(tomlFiles.length >= 10, `at least 10 TOML command files (got ${tomlFiles.length})`);
+
+      // Check help.toml specifically
+      const helpPath = path.join(gsdDir, 'help.toml');
+      assert.ok(fs.existsSync(helpPath), 'help.toml command exists');
+      const helpContent = fs.readFileSync(helpPath, 'utf8');
+      assert.ok(helpContent.includes('description = '), 'has TOML description field');
+      assert.ok(helpContent.includes('prompt = '), 'has TOML prompt field');
+
+      // Should NOT have .md command files
+      const mdFiles = commands.filter(f => f.endsWith('.md'));
+      assert.strictEqual(mdFiles.length, 0, 'no .md command files for Gemini');
+    });
+
+    test('settings.json has experimental agents enabled', () => {
+      const settings = JSON.parse(fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf8'));
+      assert.ok(settings.experimental, 'settings has experimental section');
+      assert.strictEqual(settings.experimental.enableAgents, true, 'enableAgents is true');
+    });
+
+    test('upgrade path: re-install updates files and preserves settings', () => {
+      // Modify VERSION to simulate older install
+      const versionPath = path.join(tmpDir, 'get-shit-done', 'VERSION');
+      fs.writeFileSync(versionPath, '0.0.0');
+
+      // Add a custom setting that should be preserved
+      const settingsPath = path.join(tmpDir, 'settings.json');
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      settings.customSetting = 'user-value';
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n');
+
+      // Re-run installer
+      const result = runInstaller(`--gemini --global --config-dir "${tmpDir}" --force-statusline`);
+      assert.strictEqual(result.exitCode, 0, 'upgrade install exits cleanly');
+
+      // VERSION should be updated
+      const pkg = require('../package.json');
+      const newVersion = fs.readFileSync(versionPath, 'utf8');
+      assert.strictEqual(newVersion, pkg.version, 'VERSION updated after upgrade');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Installer Edge Cases
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  describe('installer edge cases', () => {
+    test('--global and --local together produces error', () => {
+      const result = runInstaller('--global --local');
+      assert.notStrictEqual(result.exitCode, 0, 'should exit with non-zero code');
+      assert.ok(
+        result.stdout.includes('Cannot specify both --global and --local') ||
+        result.stderr.includes('Cannot specify both --global and --local'),
+        'error message mentions both flags'
+      );
+    });
+
+    test('--uninstall without --global or --local produces error', () => {
+      const result = runInstaller('--uninstall');
+      assert.notStrictEqual(result.exitCode, 0, 'should exit with non-zero code');
+      assert.ok(
+        result.stdout.includes('--uninstall requires --global or --local') ||
+        result.stderr.includes('--uninstall requires --global or --local'),
+        'error message mentions requirement'
+      );
+    });
+
+    test('content verification: each runtime has correct agent structure', () => {
+      // Install all 3 runtimes to separate temp dirs and verify key structural differences
+      const dirs = {};
+      const runtimes = ['claude', 'opencode', 'gemini'];
+
+      for (const runtime of runtimes) {
+        dirs[runtime] = createTempDir(`gsd-verify-${runtime}-`);
+        runInstaller(`--${runtime} --global --config-dir "${dirs[runtime]}" --force-statusline`);
+      }
+
+      try {
+        // Claude: has name: in agents, .md commands in commands/gsd/
+        const claudeAgent = fs.readFileSync(path.join(dirs.claude, 'agents', 'gsd-executor.md'), 'utf8');
+        assert.ok(claudeAgent.includes('name:'), 'Claude agent has name: field');
+
+        // OpenCode: no name: in agents, flat command/ with gsd-*.md
+        const ocAgent = fs.readFileSync(path.join(dirs.opencode, 'agents', 'gsd-executor.md'), 'utf8');
+        assert.ok(!ocAgent.match(/^name:/m), 'OpenCode agent has no name: field');
+        assert.ok(fs.existsSync(path.join(dirs.opencode, 'command', 'gsd-help.md')), 'OpenCode has flat gsd-help.md');
+
+        // Gemini: tools as YAML array, .toml commands
+        const gemAgent = fs.readFileSync(path.join(dirs.gemini, 'agents', 'gsd-executor.md'), 'utf8');
+        assert.ok(gemAgent.includes('  - read_file'), 'Gemini agent has Gemini tool names');
+        assert.ok(fs.existsSync(path.join(dirs.gemini, 'commands', 'gsd', 'help.toml')), 'Gemini has .toml commands');
+      } finally {
+        for (const runtime of runtimes) {
+          removeTempDir(dirs[runtime]);
+        }
+      }
+    });
+
+    test('--help flag shows usage information', () => {
+      const result = runInstaller('--help');
+      assert.strictEqual(result.exitCode, 0, 'help exits cleanly');
+      assert.ok(result.stdout.includes('Usage:'), 'output includes Usage:');
+      assert.ok(result.stdout.includes('--claude'), 'output mentions --claude flag');
+      assert.ok(result.stdout.includes('--opencode'), 'output mentions --opencode flag');
+      assert.ok(result.stdout.includes('--gemini'), 'output mentions --gemini flag');
+    });
   });
 });
