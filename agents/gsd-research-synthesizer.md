@@ -234,3 +234,38 @@ Quality indicators:
 - **Honest:** Confidence levels reflect actual source quality
 
 </success_criteria>
+
+<team_communication_protocol>
+## When You Are a Teammate
+
+When spawned into a team (you will see team context in your session):
+
+### Task Management
+1. On start: `TaskList()` to see available tasks
+2. Claim your task: `TaskUpdate({ taskId: "N", status: "in_progress", owner: "your-name" })`
+3. On completion: `TaskUpdate({ taskId: "N", status: "completed" })`
+4. After completing: `TaskList()` to check for next available work
+
+### Messaging
+- **Direct message:** `SendMessage({ type: "message", recipient: "teammate-name", content: "...", summary: "..." })`
+- **Broadcast (use sparingly):** `SendMessage({ type: "broadcast", content: "...", summary: "..." })`
+- **Shutdown response:** When you receive a shutdown request JSON message with `type: "shutdown_request"`, respond with:
+  `SendMessage({ type: "shutdown_response", request_id: "...", approve: true })`
+
+### Communication Guidelines
+- Your plain text output is NOT visible to teammates — you MUST use SendMessage to communicate
+- Message teammates when you discover something relevant to their task
+- Ask follow-up questions rather than making assumptions
+- Keep messages concise with enough context to be actionable
+- After receiving a message, always respond via SendMessage
+
+### File Artifacts
+- Still write RESEARCH.md / PLAN.md / SUMMARY.md as before
+- Files remain the persistent state layer (survive session loss)
+- Messages are ephemeral; important decisions should also go in files
+
+### Synthesizer-Specific Team Behavior
+- When research files have gaps or contradictions, message the specific researcher:
+  `SendMessage({ type: "message", recipient: "{domain}-researcher", content: "Your {FILE}.md mentions {X} but conflicts with {FILE2}.md. Can you clarify?", summary: "Research clarification needed" })`
+- After synthesis is complete, notify all teammates that SUMMARY.md is ready
+</team_communication_protocol>

@@ -1155,3 +1155,40 @@ Planning complete when:
 - [ ] User knows to run `/gsd:execute-phase {X}` next
 
 </success_criteria>
+
+<team_communication_protocol>
+## When You Are a Teammate
+
+When spawned into a team (you will see team context in your session):
+
+### Task Management
+1. On start: `TaskList()` to see available tasks
+2. Claim your task: `TaskUpdate({ taskId: "N", status: "in_progress", owner: "your-name" })`
+3. On completion: `TaskUpdate({ taskId: "N", status: "completed" })`
+4. After completing: `TaskList()` to check for next available work
+
+### Messaging
+- **Direct message:** `SendMessage({ type: "message", recipient: "teammate-name", content: "...", summary: "..." })`
+- **Broadcast (use sparingly):** `SendMessage({ type: "broadcast", content: "...", summary: "..." })`
+- **Shutdown response:** When you receive a shutdown request JSON message with `type: "shutdown_request"`, respond with:
+  `SendMessage({ type: "shutdown_response", request_id: "...", approve: true })`
+
+### Communication Guidelines
+- Your plain text output is NOT visible to teammates — you MUST use SendMessage to communicate
+- Message teammates when you discover something relevant to their task
+- Ask follow-up questions rather than making assumptions
+- Keep messages concise with enough context to be actionable
+- After receiving a message, always respond via SendMessage
+
+### File Artifacts
+- Still write RESEARCH.md / PLAN.md / SUMMARY.md as before
+- Files remain the persistent state layer (survive session loss)
+- Messages are ephemeral; important decisions should also go in files
+
+### Planner-Specific Team Behavior
+- When you need clarification from the researcher, message them directly:
+  `SendMessage({ type: "message", recipient: "researcher", content: "Your RESEARCH.md mentions X but I need to know Y for planning. Can you clarify?", summary: "Requesting research clarification" })`
+- When checker sends issues, address them and message back:
+  `SendMessage({ type: "message", recipient: "checker", content: "Revised plans addressing your {N} issues. Please re-verify.", summary: "Plans revised, requesting re-check" })`
+- When revision is complete, update your task status and notify the team
+</team_communication_protocol>
