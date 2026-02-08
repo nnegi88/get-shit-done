@@ -80,9 +80,34 @@ Plans:
 - [x] 02-04-PLAN.md -- Input validation for all command handlers
 - [x] 02-05-PLAN.md -- Integration tests for all Phase 2 changes
 
+### Phase 02.1: Claude Teams Hardening (INSERTED)
+
+**Goal**: Agent Teams orchestration is hardened with granular task dependencies, file conflict prevention, active unblocking notifications, progress visibility, adaptive revision loops, session resumption, crash recovery, and orchestrator resilience
+**Depends on:** Phase 2
+**Success Criteria** (what must be TRUE):
+  1. Plans with `depends_on` metadata create precise task dependency chains instead of wave-level blocking, so a plan starts as soon as its specific predecessors complete
+  2. Same-wave plans with overlapping `files_modified` are detected and warned about before execution begins
+  3. Completing executors send "UNBLOCKED" notifications to downstream executors via SendMessage instead of relying on polling
+  4. Orchestrator monitoring loop displays a progress table showing each executor's current task and completion percentage
+  5. Revision loop iterations adapt based on issue severity (fewer for minor, more for blockers) and terminate early when issues aren't converging
+  6. Interrupted phase execution can be resumed from where it stopped, skipping completed plans
+  7. Stale executor heartbeats (>15 min) trigger health-check and replacement executor spawning
+  8. Orchestrator state persists to disk and reconstructs on restart, with executors having a "lost leader" graceful degradation protocol
+**Plans:** 8 plans
+
+Plans:
+- [ ] 02.1-01-PLAN.md -- Granular task dependencies using depends_on metadata
+- [ ] 02.1-02-PLAN.md -- File conflict prevention for same-wave plans
+- [ ] 02.1-03-PLAN.md -- Active UNBLOCKED notifications to downstream executors
+- [ ] 02.1-04-PLAN.md -- Progress tracking dashboard with .progress files
+- [ ] 02.1-05-PLAN.md -- Adaptive revision loops with severity-based iteration limits
+- [ ] 02.1-06-PLAN.md -- Session resumption via team checkpoint files
+- [ ] 02.1-07-PLAN.md -- Crash detection via heartbeat monitoring
+- [ ] 02.1-08-PLAN.md -- Orchestrator state persistence and lost leader protocol
+
 ### Phase 3: Monolith Decomposition
 **Goal**: The 4,600-line gsd-tools.js and 1,740-line install.js are decomposed into focused modules that can be tested and maintained independently
-**Depends on**: Phase 2
+**Depends on**: Phase 02.1
 **Requirements**: ARCH-01, ARCH-02, ARCH-03
 **Success Criteria** (what must be TRUE):
   1. gsd-tools.js entry point is under 100 lines and routes to command modules via a lazy-loading registry
@@ -142,13 +167,14 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 01.1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 01.1 -> 2 -> 02.1 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Safety Net | 4/4 | ✓ Complete | 2026-02-08 |
 | 01.1. Migrate to Agent Teams | 5/5 | ✓ Complete | 2026-02-09 |
 | 2. Error Handling & Security | 5/5 | ✓ Complete | 2026-02-09 |
+| 02.1. Claude Teams Hardening | 0/0 | Not started | - |
 | 3. Monolith Decomposition | 0/0 | Not started | - |
 | 4. Data Integrity | 0/0 | Not started | - |
 | 5. Config Migration & Validation | 0/0 | Not started | - |
@@ -156,4 +182,4 @@ Phases execute in numeric order: 1 -> 01.1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-09 (Phase 2 complete)*
+*Last updated: 2026-02-09 (Phase 02.1 inserted)*
