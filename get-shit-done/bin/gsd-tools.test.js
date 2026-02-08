@@ -4799,3 +4799,201 @@ describe('error recovery: unknown and missing arguments', () => {
     assert.ok(result.error.includes('Unknown schema'), 'error mentions unknown schema');
   });
 });
+
+// ─── Phase 2: Error Handling & Security ─────────────────────────────────────
+
+// Helper that captures exit codes (err.status from execSync)
+function runGsdToolsWithExitCode(args, cwd = process.cwd()) {
+  try {
+    const result = execSync(`node "${TOOLS_PATH}" ${args}`, {
+      cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return { exitCode: 0, stdout: result.trim(), stderr: '' };
+  } catch (err) {
+    return {
+      exitCode: err.status ?? 1,
+      stdout: err.stdout?.toString().trim() || '',
+      stderr: err.stderr?.toString().trim() || err.message,
+    };
+  }
+}
+
+describe('Phase 2: Error Handling & Security', () => {
+
+  describe('POSIX exit codes (ERRH-03)', () => {
+    test('generate-slug with no args returns exit code 2', () => {
+      const r = runGsdToolsWithExitCode('generate-slug');
+      assert.strictEqual(r.exitCode, 2, 'missing args should be exit 2 (usage error)');
+    });
+
+    test('find-phase with no args returns exit code 2', () => {
+      const r = runGsdToolsWithExitCode('find-phase');
+      assert.strictEqual(r.exitCode, 2, 'missing args should be exit 2 (usage error)');
+    });
+
+    test('frontmatter get with no file returns exit code 2', () => {
+      const r = runGsdToolsWithExitCode('frontmatter get');
+      assert.strictEqual(r.exitCode, 2, 'missing file arg should be exit 2 (usage error)');
+    });
+
+    test('state get with no .planning directory returns exit code 3', () => {
+      const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-exit-'));
+      try {
+        const r = runGsdToolsWithExitCode('state get', tmpDir);
+        assert.strictEqual(r.exitCode, 3, 'missing state should be exit 3 (config error)');
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test('error messages appear on stderr with Error: prefix', () => {
+      const r = runGsdToolsWithExitCode('find-phase');
+      assert.ok(r.stderr.startsWith('Error:'), `stderr should start with "Error:", got: ${r.stderr}`);
+    });
+  });
+
+  describe('Input validation (SECU-01)', () => {
+    test('find-phase with non-numeric input returns exit 2', () => {
+      const r = runGsdToolsWithExitCode('find-phase abc');
+      assert.strictEqual(r.exitCode, 2);
+      assert.ok(r.stderr.includes('Invalid phase number'), `stderr should mention invalid phase: ${r.stderr}`);
+    });
+
+    test('find-phase with path traversal input returns exit 2', () => {
+      const r = runGsdToolsWithExitCode('find-phase ../../../etc');
+      assert.strictEqual(r.exitCode, 2);
+      assert.ok(r.stderr.includes('Invalid phase number'), `stderr should mention invalid phase: ${r.stderr}`);
+    });
+
+    test('state update with special char field name returns exit 2', () => {
+      const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-val-'));
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, '.planning', 'STATE.md'), '# Project State\n\n## Current Position\n\nPhase: 01\n');
+      try {
+        const r = runGsdToolsWithExitCode('state update "field{bad}" hack', tmpDir);
+        assert.strictEqual(r.exitCode, 2);
+        assert.ok(r.stderr.includes('Invalid field name'), `stderr should mention invalid field: ${r.stderr}`);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    test('frontmatter merge with invalid JSON returns exit 2', () => {
+      const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gsd-json-'));
+      fs.mkdirSync(path.join(tmpDir, '.planning', 'phases'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, 'test.md'), '---\nphase: 01\n---\n# test');
+      try {
+        const r = runGsdToolsWithExitCode('frontmatter merge test.md --data {bad}', tmpDir);
+        assert.strictEqual(r.exitCode, 2);
+        assert.ok(r.stderr.includes('Invalid JSON'), `stderr should mention invalid JSON: ${r.stderr}`);
+      } finally {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('Path traversal rejection (SECU-02)', () => {
+    let tmpDir;
+
+    beforeEach(() => {
+      tmpDir = createTempProject();
+      fs.writeFileSync(path.join(tmpDir, 'test.md'), '---\nphase: 01\n---\n# test');
+    });
+
+    afterEach(() => {
+      cleanup(tmpDir);
+    });
+
+    test('frontmatter get with relative path traversal is rejected', () => {
+      const r = runGsdToolsWithExitCode('frontmatter get ../../etc/passwd', tmpDir);
+      assert.ok(r.exitCode !== 0, 'should fail for path traversal');
+      assert.ok(r.stderr.includes('outside project root'), `should mention path scope: ${r.stderr}`);
+    });
+
+    test('frontmatter get with absolute path outside project is rejected', () => {
+      const r = runGsdToolsWithExitCode('frontmatter get /etc/passwd', tmpDir);
+      assert.ok(r.exitCode !== 0, 'should fail for absolute path outside project');
+      assert.ok(r.stderr.includes('outside project root'), `should mention path scope: ${r.stderr}`);
+    });
+
+    test('path traversal returns exit code 4 (filesystem error)', () => {
+      const r = runGsdToolsWithExitCode('frontmatter get /etc/passwd', tmpDir);
+      assert.strictEqual(r.exitCode, 4, 'path traversal should be exit 4 (filesystem error)');
+    });
+  });
+
+  describe('Empty catch verification (ERRH-01)', () => {
+    const sourceCode = fs.readFileSync(path.join(__dirname, 'gsd-tools.js'), 'utf-8');
+
+    test('gsd-tools.js contains zero empty catch {} blocks', () => {
+      const emptyCatchCount = (sourceCode.match(/catch\s*\{\s*\}/g) || []).length;
+      assert.strictEqual(emptyCatchCount, 0, `found ${emptyCatchCount} empty catch {} blocks, expected 0`);
+    });
+
+    test('catches with error parameter exist (>= 30)', () => {
+      const catchWithParam = (sourceCode.match(/catch\s*\(e\)/g) || []).length;
+      assert.ok(catchWithParam >= 30, `found ${catchWithParam} catch(e) blocks, expected >= 30`);
+    });
+  });
+
+  describe('Security utilities exist (SECU-03, SECU-04)', () => {
+    const sourceCode = fs.readFileSync(path.join(__dirname, 'gsd-tools.js'), 'utf-8');
+
+    test('escapeRegExp function is defined and used', () => {
+      assert.ok(sourceCode.includes('function escapeRegExp('), 'escapeRegExp should be defined');
+      const usages = (sourceCode.match(/escapeRegExp\(/g) || []).length;
+      assert.ok(usages >= 5, `escapeRegExp used ${usages} times, expected >= 5 (1 def + 4+ usages)`);
+    });
+
+    test('sanitizeJson function is defined and used', () => {
+      assert.ok(sourceCode.includes('function sanitizeJson('), 'sanitizeJson should be defined');
+      const usages = (sourceCode.match(/sanitizeJson\(/g) || []).length;
+      assert.ok(usages >= 3, `sanitizeJson used ${usages} times, expected >= 3 (1 def + 2+ usages)`);
+    });
+
+    test('sanitizeJson strips dangerous prototype keys', () => {
+      assert.ok(sourceCode.includes('__proto__'), 'sanitizeJson should check for __proto__');
+      assert.ok(sourceCode.includes('constructor'), 'sanitizeJson should check for constructor');
+      assert.ok(sourceCode.includes('prototype'), 'sanitizeJson should check for prototype');
+    });
+
+    test('validatePath function is defined and used', () => {
+      assert.ok(sourceCode.includes('function validatePath('), 'validatePath should be defined');
+      const usages = (sourceCode.match(/validatePath\(/g) || []).length;
+      assert.ok(usages >= 3, `validatePath used ${usages} times, expected >= 3 (1 def + 2+ usages)`);
+    });
+  });
+
+  describe('Error class hierarchy (ERRH-02)', () => {
+    const sourceCode = fs.readFileSync(path.join(__dirname, 'gsd-tools.js'), 'utf-8');
+
+    test('GsdError base class exists', () => {
+      assert.ok(sourceCode.includes('class GsdError extends Error'), 'GsdError class should exist');
+    });
+
+    test('ValidationError subclass exists with EXIT_USAGE', () => {
+      assert.ok(sourceCode.includes('class ValidationError extends GsdError'), 'ValidationError should extend GsdError');
+      assert.ok(sourceCode.includes('EXIT_USAGE'), 'EXIT_USAGE constant should exist');
+    });
+
+    test('ConfigError subclass exists with EXIT_CONFIG', () => {
+      assert.ok(sourceCode.includes('class ConfigError extends GsdError'), 'ConfigError should extend GsdError');
+      assert.ok(sourceCode.includes('EXIT_CONFIG'), 'EXIT_CONFIG constant should exist');
+    });
+
+    test('FileSystemError subclass exists with EXIT_FILESYSTEM', () => {
+      assert.ok(sourceCode.includes('class FileSystemError extends GsdError'), 'FileSystemError should extend GsdError');
+      assert.ok(sourceCode.includes('EXIT_FILESYSTEM'), 'EXIT_FILESYSTEM constant should exist');
+    });
+
+    test('POSIX exit code constants are defined', () => {
+      assert.ok(sourceCode.includes('EXIT_SUCCESS = 0'), 'EXIT_SUCCESS should be 0');
+      assert.ok(sourceCode.includes('EXIT_ERROR = 1'), 'EXIT_ERROR should be 1');
+      assert.ok(sourceCode.includes('EXIT_USAGE = 2'), 'EXIT_USAGE should be 2');
+      assert.ok(sourceCode.includes('EXIT_CONFIG = 3'), 'EXIT_CONFIG should be 3');
+      assert.ok(sourceCode.includes('EXIT_FILESYSTEM = 4'), 'EXIT_FILESYSTEM should be 4');
+    });
+  });
+});
