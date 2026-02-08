@@ -13,6 +13,7 @@ This roadmap delivers a systematic hardening pass across the GSD CLI codebase, o
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Safety Net** - Capture current behavior across all commands and runtimes before any code changes
+- [ ] **Phase 01.1: Migrate GSD from Subagents to Agent Teams (INSERTED)** - Replace fire-and-forget subagent spawning with Agent Teams orchestration
 - [ ] **Phase 2: Error Handling & Security** - Make failures visible and inputs validated with structured errors and security hardening
 - [ ] **Phase 3: Monolith Decomposition** - Break gsd-tools.js and install.js into focused modules with lazy-loading registry
 - [ ] **Phase 4: Data Integrity** - Protect state files with atomic writes, signal handling, file locking, and backups
@@ -39,9 +40,30 @@ Plans:
 - [x] 01-03-PLAN.md -- gsd-tools.js Tier 3-4 commands (frontmatter/template/verify/init) + error recovery + phase numbering edge cases
 - [x] 01-04-PLAN.md -- install.js runtime integration tests (3 runtimes) + hook tests + npm test script updates
 
+### Phase 01.1: Migrate GSD from Subagents to Agent Teams (INSERTED)
+
+**Goal**: Replace fire-and-forget subagent spawning with Agent Teams orchestration so agents can communicate directly, collaborate on revision loops, and self-coordinate through shared task lists
+**Depends on**: Phase 1
+**Success Criteria** (what must be TRUE):
+  1. Planner can ask researcher follow-up questions during planning (direct messaging replaces file-only handoff)
+  2. Checker and planner collaborate directly in revision loop without orchestrator bottleneck
+  3. Parallel executors can warn each other about shared dependency changes in real-time
+  4. Verifier can query executors about discrepancies found during verification
+  5. Debug workflow uses competing hypotheses with agents challenging each other's findings
+  6. All existing GSD guarantees preserved (atomic commits, state tracking, deviation rules, goal-backward verification)
+  7. Fallback to subagent mode when teams are unavailable or for single-agent workflows
+**Plans**: 5 plans
+
+Plans:
+- [ ] 01.1-01-PLAN.md -- Foundation: Team Communication Protocol for all 11 agent definitions + settings.json configuration
+- [ ] 01.1-02-PLAN.md -- plan-phase.md workflow migration (researcher-planner-checker team with direct messaging + fallback)
+- [ ] 01.1-03-PLAN.md -- execute-phase.md + execute-plan.md workflow migration (wave-based executor team + verifier querying + fallback)
+- [ ] 01.1-04-PLAN.md -- new-project.md workflow migration (research team with cross-pollination + fallback)
+- [ ] 01.1-05-PLAN.md -- Debug team workflow (competing hypotheses) + integration verification of all GSD guarantees
+
 ### Phase 2: Error Handling & Security
 **Goal**: Users get clear error messages on bad input, failures are visible instead of silent, and all inputs are validated against security threats
-**Depends on**: Phase 1
+**Depends on**: Phase 01.1
 **Requirements**: ERRH-01, ERRH-02, ERRH-03, SECU-01, SECU-02, SECU-03, SECU-04
 **Success Criteria** (what must be TRUE):
   1. Every empty catch block in the codebase is classified as intentional-fallback or bug, and bugs are fixed to propagate or log errors
@@ -117,11 +139,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 01.1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Safety Net | 4/4 | ✓ Complete | 2026-02-08 |
+| 01.1. Migrate to Agent Teams | 0/5 | Planned | - |
 | 2. Error Handling & Security | 0/0 | Not started | - |
 | 3. Monolith Decomposition | 0/0 | Not started | - |
 | 4. Data Integrity | 0/0 | Not started | - |
@@ -130,4 +153,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 ---
 *Roadmap created: 2026-02-08*
-*Last updated: 2026-02-08 (Phase 1 complete)*
+*Last updated: 2026-02-09 (Phase 01.1 planned)*
