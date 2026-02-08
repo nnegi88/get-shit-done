@@ -39,6 +39,7 @@ Progress: [██████████] 73%
 | Phase 01.1 P03 | 4 min | 2 tasks | 2 files |
 | Phase 01.1 P05 | 3 min | 2 tasks | 1 files |
 | Phase 02 P02 | 18min | 2 tasks | 2 files |
+| Phase 02 P04 | 10min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ Recent decisions affecting current work:
 - [02-01]: EXIT_USAGE for missing args/unknown subcommands, EXIT_CONFIG for missing planning files, EXIT_FILESYSTEM for missing user paths
 - [Phase 02]: Duplicated sanitizeJson in install.js -- Phase 3 decomposition will extract to shared module
 - [Phase 02]: validatePath only applied to user-facing commands, not internal path construction
+- [Phase 02]: Validation functions return null on success, error string on failure -- no exceptions for validation
 
 ### Roadmap Evolution
 
