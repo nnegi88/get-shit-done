@@ -102,40 +102,40 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ERRH-01 | — | Pending |
-| ERRH-02 | — | Pending |
-| ERRH-03 | — | Pending |
-| ERRH-04 | — | Pending |
-| SECU-01 | — | Pending |
-| SECU-02 | — | Pending |
-| SECU-03 | — | Pending |
-| SECU-04 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
-| TEST-06 | — | Pending |
-| ARCH-01 | — | Pending |
-| ARCH-02 | — | Pending |
-| ARCH-03 | — | Pending |
-| CONF-01 | — | Pending |
-| CONF-02 | — | Pending |
-| VALD-01 | — | Pending |
-| VALD-02 | — | Pending |
-| DEVX-01 | — | Pending |
-| DEVX-02 | — | Pending |
-| DEVX-03 | — | Pending |
+| ERRH-01 | Phase 2 | Pending |
+| ERRH-02 | Phase 2 | Pending |
+| ERRH-03 | Phase 2 | Pending |
+| ERRH-04 | Phase 6 | Pending |
+| SECU-01 | Phase 2 | Pending |
+| SECU-02 | Phase 2 | Pending |
+| SECU-03 | Phase 2 | Pending |
+| SECU-04 | Phase 2 | Pending |
+| DATA-01 | Phase 4 | Pending |
+| DATA-02 | Phase 4 | Pending |
+| DATA-03 | Phase 4 | Pending |
+| DATA-04 | Phase 4 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Pending |
+| TEST-04 | Phase 1 | Pending |
+| TEST-05 | Phase 1 | Pending |
+| TEST-06 | Phase 1 | Pending |
+| ARCH-01 | Phase 3 | Pending |
+| ARCH-02 | Phase 3 | Pending |
+| ARCH-03 | Phase 3 | Pending |
+| CONF-01 | Phase 5 | Pending |
+| CONF-02 | Phase 5 | Pending |
+| VALD-01 | Phase 5 | Pending |
+| VALD-02 | Phase 5 | Pending |
+| DEVX-01 | Phase 6 | Pending |
+| DEVX-02 | Phase 6 | Pending |
+| DEVX-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28 ⚠️
+- Mapped to phases: 28
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after initial definition*
+*Last updated: 2026-02-08 after roadmap creation*
