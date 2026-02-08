@@ -35,6 +35,7 @@ Progress: [████████░░] 64%
 - Trend: Accelerating
 
 *Updated after each plan completion*
+| Phase 01.1 P03 | 4 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,9 @@ Recent decisions affecting current work:
 - [01.1-04]: Direct SendMessage over broadcast for researcher cross-pollination -- targeted by domain
 - [01.1-04]: Synthesizer as teammate with addBlockedBy rather than sequential spawn-after-complete
 - [01.1-04]: Roadmapper stays standalone subagent -- single-agent workflow, no team benefit
+- [Phase 01.1]: Preserved all existing functionality verbatim in the fallback path rather than rewriting
+- [Phase 01.1]: Team mode creates ALL tasks upfront with dependency chains instead of spawning per-wave
+- [Phase 01.1]: Checkpoint handling in team mode uses SendMessage to preserve executor session context
 
 ### Roadmap Evolution
 
@@ -80,5 +84,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 01.1-04-PLAN.md (new-project workflow team migration)
+Stopped at: Completed 01.1-03-PLAN.md (execute-phase and execute-plan workflow migration)
 Resume file: .planning/phases/01.1-migrate-gsd-from-subagents-to-agent-teams/01.1-05-PLAN.md
