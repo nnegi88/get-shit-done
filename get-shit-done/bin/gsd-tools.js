@@ -3441,7 +3441,10 @@ function cmdValidateConsistency(cwd, raw) {
         }
       }
     }
-  } catch {}
+  } catch (e) {
+    // Was: empty catch (silent failure)
+    process.stderr.write(`Warning: plan numbering validation failed: ${e.message}\n`);
+  }
 
   // Check: frontmatter in plans has required fields
   try {
@@ -3461,7 +3464,10 @@ function cmdValidateConsistency(cwd, raw) {
         }
       }
     }
-  } catch {}
+  } catch (e) {
+    // Was: empty catch (silent failure)
+    process.stderr.write(`Warning: frontmatter validation failed: ${e.message}\n`);
+  }
 
   const passed = errors.length === 0;
   output({ passed, errors, warnings, warning_count: warnings.length }, raw, passed ? 'passed' : 'failed');
@@ -3505,7 +3511,8 @@ function cmdProgressRender(cwd, format, raw) {
 
       phases.push({ number: phaseNum, name: phaseName, plans, summaries, status });
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- returns empty progress
+  }
 
   const percent = totalPlans > 0 ? Math.round((totalSummaries / totalPlans) * 100) : 0;
 
@@ -3847,7 +3854,8 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
       if (contextFile) {
         result.context_content = safeReadFile(path.join(phaseDirFull, contextFile));
       }
-    } catch {}
+    } catch (e) { // Intentional: phase dir may not exist -- context stays undefined
+    }
   }
   if (includes.has('research') && phaseInfo?.directory) {
     // Find *-RESEARCH.md in phase directory
@@ -3858,7 +3866,8 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
       if (researchFile) {
         result.research_content = safeReadFile(path.join(phaseDirFull, researchFile));
       }
-    } catch {}
+    } catch (e) { // Intentional: phase dir may not exist -- research stays undefined
+    }
   }
   if (includes.has('verification') && phaseInfo?.directory) {
     // Find *-VERIFICATION.md in phase directory
@@ -3869,7 +3878,8 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
       if (verificationFile) {
         result.verification_content = safeReadFile(path.join(phaseDirFull, verificationFile));
       }
-    } catch {}
+    } catch (e) { // Intentional: phase dir may not exist -- verification stays undefined
+    }
   }
   if (includes.has('uat') && phaseInfo?.directory) {
     // Find *-UAT.md in phase directory
@@ -3880,7 +3890,8 @@ function cmdInitPlanPhase(cwd, phase, includes, raw) {
       if (uatFile) {
         result.uat_content = safeReadFile(path.join(phaseDirFull, uatFile));
       }
-    } catch {}
+    } catch (e) { // Intentional: phase dir may not exist -- UAT stays undefined
+    }
   }
 
   output(result, raw);
@@ -3904,7 +3915,8 @@ function cmdInitNewProject(cwd, raw) {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     hasCode = files.trim().length > 0;
-  } catch {}
+  } catch (e) { // Intentional: find command may fail -- hasCode stays false
+  }
 
   hasPackageFile = pathExistsInternal(cwd, 'package.json') ||
                    pathExistsInternal(cwd, 'requirements.txt') ||
@@ -3985,7 +3997,8 @@ function cmdInitQuick(cwd, description, raw) {
     if (existing.length > 0) {
       nextNum = Math.max(...existing) + 1;
     }
-  } catch {}
+  } catch (e) { // Intentional: quick dir may not exist -- nextNum stays 1
+  }
 
   const result = {
     // Models
@@ -4023,7 +4036,8 @@ function cmdInitResume(cwd, raw) {
   let interruptedAgentId = null;
   try {
     interruptedAgentId = fs.readFileSync(path.join(cwd, '.planning', 'current-agent-id.txt'), 'utf-8').trim();
-  } catch {}
+  } catch (e) { // Intentional: agent ID file may not exist -- stays null
+  }
 
   const result = {
     // File existence
@@ -4136,9 +4150,11 @@ function cmdInitTodos(cwd, area, raw) {
           area: todoArea,
           path: path.join('.planning', 'todos', 'pending', file),
         });
-      } catch {}
+      } catch (e) { // Intentional: skip unreadable todo file -- continues to next file
+      }
     }
-  } catch {}
+  } catch (e) { // Intentional: pending todos dir may not exist -- returns empty list
+  }
 
   const result = {
     // Config
@@ -4185,9 +4201,11 @@ function cmdInitMilestoneOp(cwd, raw) {
         const phaseFiles = fs.readdirSync(path.join(phasesDir, dir));
         const hasSummary = phaseFiles.some(f => f.endsWith('-SUMMARY.md') || f === 'SUMMARY.md');
         if (hasSummary) completedPhases++;
-      } catch {}
+      } catch (e) { // Intentional: skip unreadable phase dir -- continues to next
+      }
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- counts stay 0
+  }
 
   // Check archive
   const archiveDir = path.join(cwd, '.planning', 'archive');
@@ -4196,7 +4214,8 @@ function cmdInitMilestoneOp(cwd, raw) {
     archivedMilestones = fs.readdirSync(archiveDir, { withFileTypes: true })
       .filter(e => e.isDirectory())
       .map(e => e.name);
-  } catch {}
+  } catch (e) { // Intentional: archive dir may not exist -- stays empty
+  }
 
   const result = {
     // Config
@@ -4235,7 +4254,8 @@ function cmdInitMapCodebase(cwd, raw) {
   let existingMaps = [];
   try {
     existingMaps = fs.readdirSync(codebaseDir).filter(f => f.endsWith('.md'));
-  } catch {}
+  } catch (e) { // Intentional: codebase dir may not exist -- stays empty
+  }
 
   const result = {
     // Models
@@ -4311,7 +4331,8 @@ function cmdInitProgress(cwd, includes, raw) {
         nextPhase = phaseInfo;
       }
     }
-  } catch {}
+  } catch (e) { // Intentional: phases dir may not exist -- phases stays empty
+  }
 
   // Check for paused work
   let pausedAt = null;
@@ -4319,7 +4340,8 @@ function cmdInitProgress(cwd, includes, raw) {
     const state = fs.readFileSync(path.join(cwd, '.planning', 'STATE.md'), 'utf-8');
     const pauseMatch = state.match(/\*\*Paused At:\*\*\s*(.+)/);
     if (pauseMatch) pausedAt = pauseMatch[1].trim();
-  } catch {}
+  } catch (e) { // Intentional: STATE.md may not exist -- pausedAt stays null
+  }
 
   const result = {
     // Models
